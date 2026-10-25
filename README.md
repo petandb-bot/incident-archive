@@ -1,12 +1,25 @@
-# Incident Archive v0.1.2 — Stronger Chance
+# INCIDENT ARCHIVE v0.2.0 — PHENOMENA
 
-Based directly on v0.1.1 Refined. The UI, WEBGL architecture and four engines are preserved.
+A new four-engine photographic app for iPhone / smartphone-oriented use.
 
-Changes:
-- Stronger default Amount / Chance while keeping Preserve available.
-- SPECIMEN: stronger contact exposure, bleaching and rim reaction.
-- TRANSFER: larger transfer distance and clearer emulsion lift / abrasion.
-- ECHO: larger local temporal offsets, stronger contour and slit events.
-- BLOOMCAST: stronger membrane displacement, rings, reaction and bleaching without changing the engine structure.
+## Modes
+- SOLAR — sabattier / overexposed / ray-struck film behavior
+- CHEMICAL — unstable emulsion / bleach / dye-layer accidents
+- REGISTER — plate shift / chromatic misregistration / slit-like duplication
+- PRESSURE — surface stress / thin-film interference / Newton-ring style events
 
-The intention is that MUTATE produces an immediately visible incident while the source photograph remains legible.
+## Controls
+- OPEN
+- 4 MODE buttons
+- MUTATE (chance-engine re-roll)
+- EDIT panel with:
+  - AMOUNT
+  - CHANCE
+  - PRESERVE
+- SAVE
+
+## Notes
+- Built with p5.js + WEBGL
+- Designed to keep the UI simple while hiding most engine complexity
+- All four modes avoid adding literal object shapes on top of the image
+- Effects operate by changing luminance, color separation, exposure, layer drift, pressure fields, and surface phenomena

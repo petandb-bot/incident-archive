@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-mode="specimen">
+<html lang="en" data-mode="solar">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
@@ -19,7 +19,7 @@
   <main class="app-shell">
     <header class="masthead">
       <div class="wordmark"><span>INCIDENT</span><span>ARCHIVE</span></div>
-      <span class="version">0.1.2</span>
+      <span class="version">0.2.0</span>
       <button id="openPhotoTop" class="open-top" type="button">OPEN</button>
     </header>
 
@@ -34,10 +34,10 @@
 
     <section class="control-sheet" aria-label="Incident Archive controls">
       <nav class="modes" role="group" aria-label="mode">
-        <button class="mode active" data-mode="SPECIMEN" type="button" aria-pressed="true"><span>SPECIMEN</span></button>
-        <button class="mode" data-mode="TRANSFER" type="button" aria-pressed="false"><span>TRANSFER</span></button>
-        <button class="mode" data-mode="ECHO" type="button" aria-pressed="false"><span>ECHO</span></button>
-        <button class="mode" data-mode="BLOOMCAST" type="button" aria-pressed="false"><span>BLOOMCAST</span></button>
+        <button class="mode active" data-mode="SOLAR" type="button" aria-pressed="true"><span>SOLAR</span></button>
+        <button class="mode" data-mode="CHEMICAL" type="button" aria-pressed="false"><span>CHEMICAL</span></button>
+        <button class="mode" data-mode="REGISTER" type="button" aria-pressed="false"><span>REGISTER</span></button>
+        <button class="mode" data-mode="PRESSURE" type="button" aria-pressed="false"><span>PRESSURE</span></button>
       </nav>
 
       <button id="mutateButton" class="mutate-button" type="button"><span>MUTATE</span></button>
@@ -50,16 +50,16 @@
 
       <section id="editPanel" class="edit-panel" hidden>
         <div class="parameter">
-          <div class="parameter-head"><label for="amountSlider">AMOUNT</label><output id="amountValue">76</output></div>
-          <input id="amountSlider" type="range" min="0" max="100" value="76" step="1">
+          <div class="parameter-head"><label for="amountSlider">AMOUNT</label><output id="amountValue">82</output></div>
+          <input id="amountSlider" type="range" min="0" max="100" value="82" step="1">
         </div>
         <div class="parameter">
-          <div class="parameter-head"><label for="chanceSlider">CHANCE</label><output id="chanceValue">72</output></div>
-          <input id="chanceSlider" type="range" min="0" max="100" value="72" step="1">
+          <div class="parameter-head"><label for="chanceSlider">CHANCE</label><output id="chanceValue">76</output></div>
+          <input id="chanceSlider" type="range" min="0" max="100" value="76" step="1">
         </div>
         <div class="parameter">
-          <div class="parameter-head"><label for="preserveSlider">PRESERVE</label><output id="preserveValue">46</output></div>
-          <input id="preserveSlider" type="range" min="0" max="100" value="46" step="1">
+          <div class="parameter-head"><label for="preserveSlider">PRESERVE</label><output id="preserveValue">34</output></div>
+          <input id="preserveSlider" type="range" min="0" max="100" value="34" step="1">
         </div>
         <div class="export-row">
           <label for="exportSize">SIZE</label>
@@ -83,7 +83,9 @@
   <script src="https://cdn.jsdelivr.net/npm/p5@1.11.13/lib/p5.min.js"></script>
   <script src="./sketch.js"></script>
   <script>
-    if ('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).catch(console.warn));
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).catch(console.warn));
+    }
   </script>
 </body>
 </html>
