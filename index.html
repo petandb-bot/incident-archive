@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en" data-mode="specimen">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#eceae6">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Incident Archive">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="description" content="Incident Archive — chance-driven photographic incidents">
+  <title>Incident Archive</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icons/icon-180.png">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"><i></i><i></i><i></i></div>
+  <main class="app-shell">
+    <header class="masthead">
+      <div class="wordmark"><span>INCIDENT</span><span>ARCHIVE</span></div>
+      <span class="version">0.1.2</span>
+      <button id="openPhotoTop" class="open-top" type="button">OPEN</button>
+    </header>
+
+    <section class="image-world" id="stage" aria-label="image stage">
+      <div id="canvasMount" class="canvas-mount"></div>
+      <div id="emptyState" class="empty-state">
+        <div class="contact-field" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        <button id="openPhotoPrimary" class="open-primary" type="button">OPEN</button>
+      </div>
+      <div id="renderOverlay" class="render-overlay" hidden><span class="activity-indicator"></span><span id="renderLabel">MUTATING</span></div>
+    </section>
+
+    <section class="control-sheet" aria-label="Incident Archive controls">
+      <nav class="modes" role="group" aria-label="mode">
+        <button class="mode active" data-mode="SPECIMEN" type="button" aria-pressed="true"><span>SPECIMEN</span></button>
+        <button class="mode" data-mode="TRANSFER" type="button" aria-pressed="false"><span>TRANSFER</span></button>
+        <button class="mode" data-mode="ECHO" type="button" aria-pressed="false"><span>ECHO</span></button>
+        <button class="mode" data-mode="BLOOMCAST" type="button" aria-pressed="false"><span>BLOOMCAST</span></button>
+      </nav>
+
+      <button id="mutateButton" class="mutate-button" type="button"><span>MUTATE</span></button>
+
+      <div class="utility-row">
+        <button id="backButton" class="utility" type="button" disabled>BACK</button>
+        <button id="editToggle" class="utility" type="button" aria-expanded="false" aria-controls="editPanel">EDIT <span id="editChevron">＋</span></button>
+        <button id="saveButton" class="utility" type="button" disabled>SAVE</button>
+      </div>
+
+      <section id="editPanel" class="edit-panel" hidden>
+        <div class="parameter">
+          <div class="parameter-head"><label for="amountSlider">AMOUNT</label><output id="amountValue">76</output></div>
+          <input id="amountSlider" type="range" min="0" max="100" value="76" step="1">
+        </div>
+        <div class="parameter">
+          <div class="parameter-head"><label for="chanceSlider">CHANCE</label><output id="chanceValue">72</output></div>
+          <input id="chanceSlider" type="range" min="0" max="100" value="72" step="1">
+        </div>
+        <div class="parameter">
+          <div class="parameter-head"><label for="preserveSlider">PRESERVE</label><output id="preserveValue">46</output></div>
+          <input id="preserveSlider" type="range" min="0" max="100" value="46" step="1">
+        </div>
+        <div class="export-row">
+          <label for="exportSize">SIZE</label>
+          <select id="exportSize">
+            <option value="1800">1800</option>
+            <option value="2600" selected>2600</option>
+            <option value="3200">3200</option>
+          </select>
+        </div>
+      </section>
+    </section>
+
+    <div class="engine-hooks" aria-hidden="true">
+      <span id="statusText">READY / ADD A PHOTO</span>
+      <span id="variationMeta">INCIDENT / —</span>
+    </div>
+    <div id="errorPanel" class="error-panel" role="alert" hidden><strong>IMAGE ERROR</strong><span id="errorDetail"></span></div>
+  </main>
+
+  <input id="photoInput" type="file" accept="image/*" hidden>
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.11.13/lib/p5.min.js"></script>
+  <script src="./sketch.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).catch(console.warn));
+  </script>
+</body>
+</html>
