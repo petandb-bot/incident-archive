@@ -3,7 +3,7 @@
 window.IA_SCRIPT_LOADED = true;
 
 const APP = {
-  version: '0.2.0',
+  version: '0.2.1',
   mode: 'SOLAR',
   params: { amount: 82, chance: 76, preserve: 34 },
   recipe: null,
@@ -62,7 +62,6 @@ vec3 softShoulder(vec3 c){return c/(vec3(1.0)+max(c-vec3(0.72),vec3(0.0))*0.96);
 float edge(vec2 uv,float px){vec2 dx=vec2(px,0.0), dy=vec2(0.0,px);float ex=abs(lum(texM(uv+dx))-lum(texM(uv-dx)));float ey=abs(lum(texM(uv+dy))-lum(texM(uv-dy)));return sat((ex+ey)*2.2);} 
 vec3 triPalette(float t){return clamp(0.56+0.44*cos(6.2831853*(fract(t)+vec3(0.0,0.33,0.67))),0.0,1.0);} 
 float lineGlow(vec2 p, float angle, float offset, float width){vec2 q=rot2(p, angle);return exp(-pow(abs(q.y-offset)/(width+0.0001), 1.45));}
-float ringField(vec2 uv, vec2 c, float radius, float thickness){float d=abs(length(uv-c)-radius);return exp(-d*d/max(thickness*thickness,0.00001));}
 vec3 hsvShiftLike(vec3 c, float shift){
   float y = lum(c);
   vec3 a = vec3(y);
@@ -91,17 +90,17 @@ void main(){
   float edgeRim = smoothstep(0.05,0.35,e + reverseBand*0.25);
   vec3 rimTint = mix(triPalette(uR1.x + y*0.6), mix(uC0,uC1,0.5), 0.45);
   sabattier = mix(sabattier, vec3(1.0), edgeRim*(0.12+0.55*amt)*(0.45+0.55*ch));
-  sabattier = screenBlend(sabattier, rimTint * edgeRim * (0.14+0.34*amt));
+  sabattier = screenBlend(sabattier, rimTint * edgeRim * (0.12+0.24*amt));
 
   float ang0=mix(-1.2,1.2,uR1.y);
   float ang1=ang0+mix(0.18,0.9,uR1.z);
-  float ray0=lineGlow(p,ang0,mix(-0.18,0.18,uH0.x),mix(0.010,0.060,uH0.y));
-  float ray1=lineGlow(p,ang1,mix(-0.16,0.16,uH0.z),mix(0.012,0.080,uH0.w));
-  float rayField = sat(ray0*0.85+ray1*0.72) * smoothstep(0.24,0.88,n0+0.25*n1+0.15);
-  vec3 rayTint = mix(mix(uC1,vec3(1.0,0.98,0.94),0.45), triPalette(uR2.x + n1*0.4), 0.45);
-  sabattier = screenBlend(sabattier, rayTint * rayField * (0.32+0.62*amt));
+  float ray0=lineGlow(p,ang0,mix(-0.18,0.18,uH0.x),mix(0.010,0.045,uH0.y));
+  float ray1=lineGlow(p,ang1,mix(-0.16,0.16,uH0.z),mix(0.012,0.055,uH0.w));
+  float rayField = sat(ray0*0.72+ray1*0.56) * smoothstep(0.54,0.94,n0+0.18*n1+0.08);
+  vec3 rayTint = mix(mix(uC1,vec3(1.0,0.98,0.94),0.45), triPalette(uR2.x + n1*0.4), 0.38);
+  sabattier = screenBlend(sabattier, rayTint * rayField * (0.16+0.30*amt));
 
-  float clipLift = reverseBand*(0.16+0.55*amt)*(0.62+0.38*ch) + rayField*(0.10+0.28*amt);
+  float clipLift = reverseBand*(0.16+0.55*amt)*(0.62+0.38*ch) + rayField*(0.04+0.12*amt);
   sabattier = mix(sabattier, vec3(1.0), clipLift*(1.0-y*0.35));
   sabattier = mix(sabattier, hsvShiftLike(sabattier, uR2.y*0.6+n0*0.1), 0.22+0.22*ch);
 
@@ -193,39 +192,59 @@ void main(){
   gl_FragColor = vec4(clamp(outc,0.0,1.0),1.0);
 }`;
 
-const PRESSURE_FRAG = COMMON + `
+const CONTACT_FRAG = COMMON + `
 void main(){
   vec2 uv=vTexCoord;
   vec2 p=uv-0.5;
   vec3 base=texM(uv);
   float amt=uAmount, ch=uChance;
 
-  vec2 c0=vec2(mix(0.18,0.82,uH0.x), mix(0.18,0.82,uH0.y));
-  vec2 c1=vec2(mix(0.18,0.82,uH1.x), mix(0.18,0.82,uH1.y));
-  float r0=ringField(uv,c0,mix(0.08,0.34,uH0.z),mix(0.004,0.030,uH0.w));
-  float r1=ringField(uv,c1,mix(0.07,0.30,uH1.z),mix(0.004,0.024,uH1.w));
-  float n0=fbm6(rot2(p,(uR0.x-0.5)*1.6)*2.8+vec2(uSeed*0.015,5.0));
-  float n1=fbm4(rot2(p,(uR0.y-0.5)*2.2)*5.0+vec2(29.0,uSeed*0.011));
-  float stress = smoothstep(0.24,0.86, n0*0.78 + n1*0.42 + r0*0.55 + r1*0.48);
+  vec2 wa = vec2(fbm4(rot2(p, uR0.x*2.5-1.2)*2.2 + vec2(8.0,uSeed*0.012))-0.5,
+                 fbm4(rot2(p,-uR0.y*2.3+1.1)*2.0 + vec2(uSeed*0.014,21.0))-0.5);
+  vec2 wb = vec2(fbm4(rot2(p, uR0.z*2.8-1.4)*3.8 + vec2(27.0,uSeed*0.016))-0.5,
+                 fbm4(rot2(p,-uR0.w*2.4+1.0)*3.4 + vec2(uSeed*0.018,37.0))-0.5);
 
-  vec2 flow = vec2(noise2(uv*3.5+vec2(uSeed,4.0))-0.5, noise2(uv*3.1+vec2(17.0,uSeed))-0.5);
-  vec2 px=vec2(1.0)/uResolution;
-  vec2 disp = flow * px * mix(2.0,14.0,amt) * stress;
-  vec3 warped = texM(uv+disp);
+  vec2 q0 = rot2(p + wa*0.18, mix(-1.1,1.1,uH0.x));
+  vec2 q1 = rot2(p + wb*0.16, mix(-1.4,1.4,uH0.y));
+  q0 *= vec2(mix(0.9,1.6,uH1.x), mix(1.3,2.4,uH1.y));
+  q1 *= vec2(mix(1.2,2.2,uH1.z), mix(0.8,1.9,uH1.w));
 
-  float thin = sat((r0+r1)*0.82 + pow(ridge(0.5+0.5*sin((n1+n0)*18.0)),10.0)*0.28*ch);
-  vec3 irides = triPalette(n0*0.55 + thin*0.35 + uR1.x*0.3);
-  vec3 pressureTint = mix(vec3(1.0,0.98,0.96), irides, 0.55);
+  float n0 = fbm6(q0*2.2 + vec2(uSeed*0.011, 5.0));
+  float n1 = fbm4(q0*5.8 + vec2(14.0, uSeed*0.015));
+  float n2 = fbm6(q1*2.8 + vec2(33.0, uSeed*0.013));
+  float n3 = fbm4(q1*6.2 + vec2(uSeed*0.017, 41.0));
 
-  vec3 outc = mix(base, warped, stress*(0.18+0.24*amt));
-  outc = mix(outc, softLight(outc, pressureTint), thin*(0.18+0.42*amt));
-  outc = screenBlend(outc, pressureTint * thin * (0.10+0.24*ch));
-  outc *= 1.0 - stress*(0.03+0.14*amt)*(0.7-lum(base)*0.35);
-  outc = mix(outc, vec3(1.0), thin*(0.05+0.12*amt)*(1.0-lum(base)*0.22));
-  outc += vec3((hash21(floor(uv*uResolution)+uSeed*37.0)-0.5) * (0.005+0.006*amt));
-  outc = preserveSource(base, outc);
-  outc = softShoulder(outc);
-  gl_FragColor = vec4(clamp(outc,0.0,1.0),1.0);
+  float m0 = smoothstep(0.50,0.82, n0*0.82 + n1*0.24 - length(q0)*0.28);
+  float m1 = smoothstep(0.54,0.84, n2*0.78 + n3*0.26 - dot(abs(q1),vec2(0.24,0.16)));
+
+  float strand0 = lineGlow(q0, mix(-1.5,1.5,uR1.x), (n1-0.5)*0.22, mix(0.006,0.026,uR1.y));
+  float strand1 = lineGlow(q1, mix(-1.2,1.2,uR1.z), (n3-0.5)*0.18, mix(0.004,0.022,uR1.w));
+  float threadField = sat(strand0*0.62 + strand1*0.58) * smoothstep(0.34,0.84,n0+n2*0.3);
+
+  float shadow = sat(max(m0*0.88, m1*0.82) + threadField*0.26);
+  float edgeBand = max(0.0, smoothstep(0.34,0.60,shadow) - smoothstep(0.60,0.88,shadow));
+  float exposureFog = smoothstep(0.26,0.88, fbm4(rot2(p,0.35)*2.0 + vec2(uSeed*0.02,71.0)) + (1.0-shadow)*0.24 - length(p)*0.10);
+  float paperLift = smoothstep(0.44,0.92, exposureFog + edgeBand*0.42);
+
+  vec3 exposed = mix(base, hsvShiftLike(base, uH2.x*0.68 + n2*0.18), 0.12 + 0.28*amt);
+  exposed = mix(exposed, exposed.bgr, (0.05+0.12*ch) * smoothstep(0.0,0.45,1.0-lum(base)));
+
+  vec3 shadowTint = mix(vec3(0.10,0.10,0.11), mix(uC0,uC1,0.5), 0.18);
+  vec3 paperTint = mix(vec3(1.0,0.985,0.95), mix(uC1,uC2,0.5), 0.16);
+  vec3 contact = exposed;
+
+  contact = mix(contact, contact*mix(0.20,0.70,uH2.y) + shadowTint*0.08, shadow*(0.34+0.40*amt));
+  contact = screenBlend(contact, paperTint * edgeBand * (0.16+0.34*amt));
+  contact = mix(contact, vec3(1.0), edgeBand*(0.06+0.14*amt)*(1.0-lum(base)*0.32));
+  contact = screenBlend(contact, paperTint * paperLift * (0.08+0.18*ch) * (1.0-shadow*0.68));
+
+  float powder = pow(hash21(floor(uv*uResolution*0.16)+uSeed*13.0), 12.0) * (0.04+0.10*amt) * (shadow + edgeBand);
+  contact = mix(contact, vec3(0.96,0.94,0.88), powder);
+  contact += vec3((hash21(floor(uv*uResolution)+uSeed*43.0)-0.5) * (0.006+0.008*amt));
+  contact = mix(contact, hsvShiftLike(contact, uH2.z*0.54 + exposureFog*0.12), 0.10+0.18*ch);
+  contact = preserveSource(base, contact);
+  contact = softShoulder(contact);
+  gl_FragColor = vec4(clamp(contact,0.0,1.0),1.0);
 }`;
 
 const PALETTES = [
@@ -241,7 +260,7 @@ const FAMILIES = {
   SOLAR:['SABATTIER','METALLIC','FLASHLINE','PARTIAL NEGATIVE','OVEREXPOSE'],
   CHEMICAL:['BLEACH BATH','DYE FAILURE','DEVELOPER SURGE','CROSS BATH','SILVER RESIDUE'],
   REGISTER:['OFFSET','SLIT','DOUBLE', 'MISALIGN', 'PLATE SHIFT'],
-  PRESSURE:['THIN FILM','NEWTON RING','SURFACE STRESS','EMULSION BEND','CONTACT PRESS']
+  CONTACT:['CONTACT BURN','SHADOW TRACE','PHOTOGRAM','PAPER GHOST','EXPOSURE IMPRINT']
 };
 
 let ui = {};
@@ -256,7 +275,7 @@ function setup(){
     APP.shaders.SOLAR = createShader(VERT, SOLAR_FRAG);
     APP.shaders.CHEMICAL = createShader(VERT, CHEMICAL_FRAG);
     APP.shaders.REGISTER = createShader(VERT, REGISTER_FRAG);
-    APP.shaders.PRESSURE = createShader(VERT, PRESSURE_FRAG);
+    APP.shaders.CONTACT = createShader(VERT, CONTACT_FRAG);
     APP.recipe = makeRecipe(APP.mode);
     APP.ready = true;
     wireUI();
@@ -426,7 +445,7 @@ function shaderSourceFor(mode){
   if(mode==='SOLAR') return SOLAR_FRAG;
   if(mode==='CHEMICAL') return CHEMICAL_FRAG;
   if(mode==='REGISTER') return REGISTER_FRAG;
-  return PRESSURE_FRAG;
+  return CONTACT_FRAG;
 }
 
 function renderPreview(){

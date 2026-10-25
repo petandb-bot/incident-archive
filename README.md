@@ -1,25 +1,17 @@
-# INCIDENT ARCHIVE v0.2.0 — PHENOMENA
+# Incident Archive v0.2.1 CONTACT PRINT
 
-A new four-engine photographic app for iPhone / smartphone-oriented use.
+This version keeps SOLAR / CHEMICAL / REGISTER as the core structure and replaces the old PRESSURE mode with a CONTACT engine inspired by photogram, contact print, and shadow-burn phenomena.
 
-## Modes
-- SOLAR — sabattier / overexposed / ray-struck film behavior
-- CHEMICAL — unstable emulsion / bleach / dye-layer accidents
-- REGISTER — plate shift / chromatic misregistration / slit-like duplication
-- PRESSURE — surface stress / thin-film interference / Newton-ring style events
+## Changes
+- SOLAR: keeps the sabattier / overexposed film mood, but rays are quieter and appear less intrusively.
+- CHEMICAL: unchanged direction.
+- REGISTER: unchanged direction.
+- CONTACT: new photogram-like engine with soft shadow masks, contact-burn edges, thread-like traces, and exposed paper glow.
 
-## Controls
-- OPEN
-- 4 MODE buttons
-- MUTATE (chance-engine re-roll)
-- EDIT panel with:
-  - AMOUNT
-  - CHANCE
-  - PRESERVE
-- SAVE
-
-## Notes
-- Built with p5.js + WEBGL
-- Designed to keep the UI simple while hiding most engine complexity
-- All four modes avoid adding literal object shapes on top of the image
-- Effects operate by changing luminance, color separation, exposure, layer drift, pressure fields, and surface phenomena
+## Files
+- index.html
+- style.css
+- sketch.js
+- manifest.webmanifest
+- sw.js
+- icons/

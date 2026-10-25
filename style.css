@@ -5,7 +5,7 @@
 }
 html[data-mode="chemical"]{--accent:145,202,162;--accent2:119,174,229;--bed:#d5ddd7}
 html[data-mode="register"]{--accent:137,183,239;--accent2:226,142,232;--bed:#d7dbe1}
-html[data-mode="pressure"]{--accent:197,173,239;--accent2:180,225,228;--bed:#dad9df}
+html[data-mode="contact"]{--accent:197,173,239;--accent2:180,225,228;--bed:#dad9df}
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);font-family:Arial,Helvetica,"Helvetica Neue",sans-serif;-webkit-font-smoothing:antialiased}
 body{min-height:100svh;overflow-x:hidden;overscroll-behavior-y:none}
