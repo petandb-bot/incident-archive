@@ -1,3 +1,10 @@
+# Incident Archive v0.2.5 — Preview Density Fix
+
+- Fixes preview-only edge stretching on Retina / high-DPI displays.
+- Keeps original image aspect ratio.
+- Export behavior and all four engine algorithms are unchanged from v0.2.4.
+- Preview shader resolution now uses the physical WEBGL drawing-buffer size.
+
 Incident Archive v0.2.4
 
 - aspect-ratio preserved for landscape / portrait images

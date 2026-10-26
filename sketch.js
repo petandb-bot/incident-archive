@@ -3,7 +3,7 @@
 window.IA_SCRIPT_LOADED = true;
 
 const APP = {
-  version: '0.2.4',
+  version: '0.2.5',
   mode: 'SOLAR',
   params: { amount: 82, chance: 76, preserve: 34 },
   recipe: null,
@@ -511,7 +511,11 @@ function renderPreview(){
   try{
     const sh=APP.shaders[APP.mode];
     shader(sh);
-    setUniforms(sh,width,height);
+    /* gl_FragCoord is expressed in drawing-buffer pixels. On Retina/iPhone
+       the preview buffer can be 2x the p5 logical canvas size, so pass the
+       physical resolution here. Export already uses pixelDensity(1). */
+    const d=pixelDensity();
+    setUniforms(sh,width*d,height*d);
     clear();
     plane(width,height,1,1);
     resetShader();

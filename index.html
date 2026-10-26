@@ -12,14 +12,14 @@
   <title>Incident Archive</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icons/icon-180.png">
-  <link rel="stylesheet" href="./style.css?v=024">
+  <link rel="stylesheet" href="./style.css?v=025">
 </head>
 <body>
   <div class="ambient" aria-hidden="true"><i></i><i></i><i></i></div>
   <main class="app-shell">
     <header class="masthead">
       <div class="wordmark"><span>INCIDENT</span><span>ARCHIVE</span></div>
-      <span class="version">0.2.4</span>
+      <span class="version">0.2.5</span>
       <button id="openPhotoTop" class="open-top" type="button">OPEN</button>
     </header>
 
@@ -84,7 +84,7 @@
 
   <input id="photoInput" type="file" accept="image/*" hidden>
   <script src="https://cdn.jsdelivr.net/npm/p5@1.11.13/lib/p5.min.js"></script>
-  <script src="./sketch.js?v=024"></script>
+  <script src="./sketch.js?v=025"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).catch(console.warn));
