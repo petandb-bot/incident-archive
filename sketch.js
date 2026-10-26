@@ -3,7 +3,7 @@
 window.IA_SCRIPT_LOADED = true;
 
 const APP = {
-  version: '0.2.3',
+  version: '0.2.4',
   mode: 'SOLAR',
   params: { amount: 82, chance: 76, preserve: 34 },
   recipe: null,
@@ -47,8 +47,9 @@ uniform vec3 uC2;
 float sat(float x){return clamp(x,0.0,1.0);} 
 vec3 sat3(vec3 x){return clamp(x,0.0,1.0);} 
 float lum(vec3 c){return dot(c, vec3(0.2126,0.7152,0.0722));}
-vec2 mirrorUV(vec2 uv){vec2 q=mod(uv,2.0);return 1.0-abs(q-1.0);} 
-vec3 texM(vec2 uv){return texture2D(uTex, mirrorUV(uv)).rgb;} 
+vec2 clampUV(vec2 uv){return clamp(uv, vec2(0.0), vec2(1.0));} 
+float outside(vec2 uv){vec2 c=clampUV(uv);return max(abs(uv.x-c.x),abs(uv.y-c.y));} 
+vec3 texM(vec2 uv){return texture2D(uTex, clampUV(uv)).rgb;} 
 vec2 screenUV(){vec2 uv=gl_FragCoord.xy/max(uResolution,vec2(1.0));uv.y=1.0-uv.y;return uv;} 
 float hash21(vec2 p){p=fract(p*vec2(123.34,345.45));p+=dot(p,p+34.345);return fract(p.x*p.y);} 
 float noise2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);float a=hash21(i),b=hash21(i+vec2(1,0)),c=hash21(i+vec2(0,1)),d=hash21(i+vec2(1,1));return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);} 
@@ -287,12 +288,15 @@ const FAMILIES = {
 };
 
 let ui = {};
+let previewHold = { fitW: 960, fitH: 720, offsetX: 0, offsetY: 0 };
 
 function setup(){
   try{
     ui = bindUI();
     const c = createCanvas(960, 720, WEBGL);
     c.parent('canvasMount');
+    c.elt.style.position='absolute';
+    c.elt.style.inset='0';
     pixelDensity(Math.min(window.devicePixelRatio || 1, 2));
     noStroke();
     APP.shaders.SOLAR = createShader(VERT, SOLAR_FRAG);
@@ -376,10 +380,33 @@ function handleFile(e){
   });
 }
 
+function computePreviewFit(srcW, srcH){
+  const mount = ui.canvasMount;
+  const mountW = Math.max(320, (mount && mount.clientWidth) ? mount.clientWidth : window.innerWidth - 48);
+  const mountH = Math.max(320, (mount && mount.clientHeight) ? mount.clientHeight : Math.round(window.innerHeight * 0.62));
+  const maxTex = window.innerWidth < 821 ? 1400 : 1800;
+  const scale = Math.min(mountW / srcW, mountH / srcH, maxTex / Math.max(srcW, srcH), 1);
+  const fitW = Math.max(2, Math.round(srcW * scale));
+  const fitH = Math.max(2, Math.round(srcH * scale));
+  return {
+    fitW,
+    fitH,
+    offsetX: (mountW - fitW) * 0.5,
+    offsetY: (mountH - fitH) * 0.5
+  };
+}
+
 function fitPreviewCanvas(w,h){
-  const maxDim=window.innerWidth<821?1180:1500;
-  const s=Math.min(1,maxDim/Math.max(w,h));
-  resizeCanvas(Math.max(2,Math.round(w*s)),Math.max(2,Math.round(h*s)));
+  previewHold = computePreviewFit(w, h);
+  resizeCanvas(previewHold.fitW, previewHold.fitH);
+  const elt = canvas && canvas.elt ? canvas.elt : document.querySelector('#canvasMount canvas');
+  if(elt){
+    elt.style.width = previewHold.fitW + 'px';
+    elt.style.height = previewHold.fitH + 'px';
+    elt.style.position = 'absolute';
+    elt.style.left = Math.round(previewHold.offsetX) + 'px';
+    elt.style.top = Math.round(previewHold.offsetY) + 'px';
+  }
 }
 
 function setMode(mode,push=true){
@@ -549,6 +576,8 @@ function showError(err){
 }
 
 function windowResized(){
-  if(APP.source&&window.innerWidth<821) fitPreviewCanvas(APP.source.width,APP.source.height);
+  if(APP.source){
+    fitPreviewCanvas(APP.source.width, APP.source.height);
+  }
   renderPreview();
 }

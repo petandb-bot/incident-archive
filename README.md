@@ -1,3 +1,9 @@
+Incident Archive v0.2.4
+
+- aspect-ratio preserved for landscape / portrait images
+- mirrored edge extension removed
+- preview fits image naturally inside stage
+
 # Incident Archive v0.2.3 — UV FIX
 
 This revision fixes the center seam and large triangular discontinuities visible in CHEMICAL output.
