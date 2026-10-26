@@ -1,6 +1,6 @@
 {
   "name": "Incident Archive",
-  "short_name": "Archive",
+  "short_name": "Incident",
   "display": "standalone",
   "background_color": "#eceae6",
   "theme_color": "#eceae6",
@@ -23,5 +23,5 @@
       "type": "image/png"
     }
   ],
-  "description": "Incident Archive v0.2.2 \u2014 chance-driven photographic incidents"
+  "description": "Incident Archive v0.2.2 — chance-driven photographic incidents"
 }

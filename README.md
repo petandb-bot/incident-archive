@@ -1,4 +1,4 @@
-# Incident Archive v0.2.5 — Preview Density Fix
+# Incident Archive v0.2.6 — Preview Density Fix
 
 - Fixes preview-only edge stretching on Retina / high-DPI displays.
 - Keeps original image aspect ratio.
@@ -25,4 +25,11 @@ This revision fixes the center seam and large triangular discontinuities visible
 - SOLAR
 - CHEMICAL
 - REGISTER
-- PHOTOGRAM
+- LATENT
+
+
+## v0.2.6 tuning
+- SOLAR: intensity slightly reduced for better usability on portraits while keeping optical flare/ray behavior.
+- CHEMICAL: softened destructive drift and tuned dye behavior for higher hit-rate on people.
+- REGISTER: kept close to v0.2.5 with minor subject protection.
+- LATENT: renamed from PHOTOGRAM and reworked toward latent-image / density-plate behavior, differentiated from CHEMICAL.
