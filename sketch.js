@@ -3,7 +3,7 @@
 window.IA_SCRIPT_LOADED = true;
 
 const APP = {
-  version: '0.2.2',
+  version: '0.2.3',
   mode: 'SOLAR',
   params: { amount: 82, chance: 76, preserve: 34 },
   recipe: null,
@@ -49,6 +49,7 @@ vec3 sat3(vec3 x){return clamp(x,0.0,1.0);}
 float lum(vec3 c){return dot(c, vec3(0.2126,0.7152,0.0722));}
 vec2 mirrorUV(vec2 uv){vec2 q=mod(uv,2.0);return 1.0-abs(q-1.0);} 
 vec3 texM(vec2 uv){return texture2D(uTex, mirrorUV(uv)).rgb;} 
+vec2 screenUV(){vec2 uv=gl_FragCoord.xy/max(uResolution,vec2(1.0));uv.y=1.0-uv.y;return uv;} 
 float hash21(vec2 p){p=fract(p*vec2(123.34,345.45));p+=dot(p,p+34.345);return fract(p.x*p.y);} 
 float noise2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);float a=hash21(i),b=hash21(i+vec2(1,0)),c=hash21(i+vec2(0,1)),d=hash21(i+vec2(1,1));return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);} 
 float fbm4(vec2 p){float v=0.0,a=0.52;mat2 m=mat2(1.57,1.11,-1.11,1.57);for(int i=0;i<4;i++){v+=a*noise2(p);p=m*p+13.71;a*=0.5;}return v;} 
@@ -73,7 +74,7 @@ vec3 hsvShiftLike(vec3 c, float shift){
 
 const SOLAR_FRAG = COMMON + `
 void main(){
-  vec2 uv=vTexCoord;
+  vec2 uv=screenUV();
   vec2 p=uv-0.5;
   vec3 base=texM(uv);
   float amt=uAmount, ch=uChance;
@@ -118,7 +119,7 @@ void main(){
 
 const CHEMICAL_FRAG = COMMON + `
 void main(){
-  vec2 uv=vTexCoord;
+  vec2 uv=screenUV();
   vec2 p=uv-0.5;
   vec3 base=texM(uv);
   float amt=uAmount, ch=uChance;
@@ -158,7 +159,7 @@ void main(){
 
 const REGISTER_FRAG = COMMON + `
 void main(){
-  vec2 uv=vTexCoord;
+  vec2 uv=screenUV();
   vec2 p=uv-0.5;
   vec3 base=texM(uv);
   float amt=uAmount, ch=uChance;
@@ -211,7 +212,7 @@ float exposureField(vec2 p, float seedA, float seedB){
   return broad*0.72+detail*0.18+directional*0.10;
 }
 void main(){
-  vec2 uv=vTexCoord;
+  vec2 uv=screenUV();
   vec2 p=uv-0.5;
   vec3 base=texM(uv);
   float amt=uAmount, ch=uChance;
