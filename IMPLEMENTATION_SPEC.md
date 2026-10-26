@@ -1,14 +1,16 @@
-# Incident Archive v0.2.1 — Implementation Spec
+# Incident Archive v0.2.2
 
-- Base: v0.2.0 phenomena architecture
-- Modes:
-  - SOLAR: slightly reduced ray dominance while keeping sabattier / film-burn identity
-  - CHEMICAL: retained
-  - REGISTER: retained
-  - CONTACT: replaces PRESSURE with a photogram/contact-print style shader
-- CONTACT engine:
-  - organic shadow masks built from warped FBM fields
-  - thread/filament sub-structures
-  - exposed-paper bleaching at mask edges
-  - palette-driven exposure drift rather than object insertion
-- UI architecture unchanged for stability
+## Locked
+CHEMICAL and REGISTER shader blocks are retained from v0.2.0.
+
+## SOLAR
+Sabattier / reversal behavior retained. FLASHLINE is now the only recipe that enables a ray. The ray is broader, softer and weaker. Other SOLAR recipes have no ray.
+
+## PHOTOGRAM
+PRESSURE was removed. PHOTOGRAM operates on broad warped exposure masks rather than inserted objects or circular rings. Hidden families: CONTACT WHITE, NEGATIVE SHADOW, SILVER CONTACT, COLOR NEGATIVE, PALE EXPOSURE.
+
+## GUI
+The previous contact-field illustration was removed. Empty state is now a quiet 3:4 plate with a subtle exposure wash and small metadata.
+
+## Cache
+Service Worker cache key changed to incident-archive-v022. Same-origin requests use network-first and index references versioned CSS/JS URLs.

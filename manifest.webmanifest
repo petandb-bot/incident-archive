@@ -1,14 +1,27 @@
 {
   "name": "Incident Archive",
-  "short_name": "Incident",
-  "start_url": "./",
+  "short_name": "Archive",
   "display": "standalone",
   "background_color": "#eceae6",
   "theme_color": "#eceae6",
-  "description": "Chance-driven photographic incidents.",
+  "start_url": "./index.html",
+  "scope": "./",
   "icons": [
-    {"src": "./icons/icon-180.png", "sizes": "180x180", "type": "image/png"},
-    {"src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
-    {"src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png"}
-  ]
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "./icons/icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ],
+  "description": "Incident Archive v0.2.2 \u2014 chance-driven photographic incidents"
 }

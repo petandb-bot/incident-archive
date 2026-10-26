@@ -12,21 +12,24 @@
   <title>Incident Archive</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icons/icon-180.png">
-  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./style.css?v=022">
 </head>
 <body>
   <div class="ambient" aria-hidden="true"><i></i><i></i><i></i></div>
   <main class="app-shell">
     <header class="masthead">
       <div class="wordmark"><span>INCIDENT</span><span>ARCHIVE</span></div>
-      <span class="version">0.2.1</span>
+      <span class="version">0.2.2</span>
       <button id="openPhotoTop" class="open-top" type="button">OPEN</button>
     </header>
 
     <section class="image-world" id="stage" aria-label="image stage">
       <div id="canvasMount" class="canvas-mount"></div>
       <div id="emptyState" class="empty-state">
-        <div class="contact-field" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        <div class="empty-plate" aria-hidden="true">
+          <div class="plate-exposure"></div>
+          <div class="plate-meta"><span>NO IMAGE</span><span>01 / IA</span></div>
+        </div>
         <button id="openPhotoPrimary" class="open-primary" type="button">OPEN</button>
       </div>
       <div id="renderOverlay" class="render-overlay" hidden><span class="activity-indicator"></span><span id="renderLabel">MUTATING</span></div>
@@ -37,7 +40,7 @@
         <button class="mode active" data-mode="SOLAR" type="button" aria-pressed="true"><span>SOLAR</span></button>
         <button class="mode" data-mode="CHEMICAL" type="button" aria-pressed="false"><span>CHEMICAL</span></button>
         <button class="mode" data-mode="REGISTER" type="button" aria-pressed="false"><span>REGISTER</span></button>
-        <button class="mode" data-mode="CONTACT" type="button" aria-pressed="false"><span>CONTACT</span></button>
+        <button class="mode" data-mode="PHOTOGRAM" type="button" aria-pressed="false"><span>PHOTOGRAM</span></button>
       </nav>
 
       <button id="mutateButton" class="mutate-button" type="button"><span>MUTATE</span></button>
@@ -81,7 +84,7 @@
 
   <input id="photoInput" type="file" accept="image/*" hidden>
   <script src="https://cdn.jsdelivr.net/npm/p5@1.11.13/lib/p5.min.js"></script>
-  <script src="./sketch.js"></script>
+  <script src="./sketch.js?v=022"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).catch(console.warn));

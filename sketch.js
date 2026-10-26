@@ -3,7 +3,7 @@
 window.IA_SCRIPT_LOADED = true;
 
 const APP = {
-  version: '0.2.1',
+  version: '0.2.2',
   mode: 'SOLAR',
   params: { amount: 82, chance: 76, preserve: 34 },
   recipe: null,
@@ -62,6 +62,7 @@ vec3 softShoulder(vec3 c){return c/(vec3(1.0)+max(c-vec3(0.72),vec3(0.0))*0.96);
 float edge(vec2 uv,float px){vec2 dx=vec2(px,0.0), dy=vec2(0.0,px);float ex=abs(lum(texM(uv+dx))-lum(texM(uv-dx)));float ey=abs(lum(texM(uv+dy))-lum(texM(uv-dy)));return sat((ex+ey)*2.2);} 
 vec3 triPalette(float t){return clamp(0.56+0.44*cos(6.2831853*(fract(t)+vec3(0.0,0.33,0.67))),0.0,1.0);} 
 float lineGlow(vec2 p, float angle, float offset, float width){vec2 q=rot2(p, angle);return exp(-pow(abs(q.y-offset)/(width+0.0001), 1.45));}
+float ringField(vec2 uv, vec2 c, float radius, float thickness){float d=abs(length(uv-c)-radius);return exp(-d*d/max(thickness*thickness,0.00001));}
 vec3 hsvShiftLike(vec3 c, float shift){
   float y = lum(c);
   vec3 a = vec3(y);
@@ -82,33 +83,37 @@ void main(){
   float e=edge(uv,1.4/uResolution.x);
   float y=lum(base);
 
-  float threshold = mix(0.38,0.74,uR0.z) + (n0-0.5)*(0.10+0.18*ch);
-  float reverseBand = smoothstep(threshold-0.08-0.10*amt, threshold+0.06, y + (n1-0.5)*0.12);
+  float threshold = mix(0.36,0.75,uR0.z) + (n0-0.5)*(0.10+0.18*ch);
+  float reverseBand = smoothstep(threshold-0.09-0.10*amt, threshold+0.055, y + (n1-0.5)*0.12);
   vec3 inv = vec3(1.0)-base;
-  vec3 sabattier = mix(base, inv, reverseBand*(0.52+0.42*amt));
+  vec3 sabattier = mix(base, inv, reverseBand*(0.54+0.40*amt));
 
   float edgeRim = smoothstep(0.05,0.35,e + reverseBand*0.25);
   vec3 rimTint = mix(triPalette(uR1.x + y*0.6), mix(uC0,uC1,0.5), 0.45);
   sabattier = mix(sabattier, vec3(1.0), edgeRim*(0.12+0.55*amt)*(0.45+0.55*ch));
-  sabattier = screenBlend(sabattier, rimTint * edgeRim * (0.12+0.24*amt));
+  sabattier = screenBlend(sabattier, rimTint * edgeRim * (0.13+0.28*amt));
 
+  /* Rays are now a rare recipe event (FLASHLINE only). */
+  float rayGate = smoothstep(0.86,0.96,uR2.w);
   float ang0=mix(-1.2,1.2,uR1.y);
-  float ang1=ang0+mix(0.18,0.9,uR1.z);
-  float ray0=lineGlow(p,ang0,mix(-0.18,0.18,uH0.x),mix(0.010,0.045,uH0.y));
-  float ray1=lineGlow(p,ang1,mix(-0.16,0.16,uH0.z),mix(0.012,0.055,uH0.w));
-  float rayField = sat(ray0*0.72+ray1*0.56) * smoothstep(0.54,0.94,n0+0.18*n1+0.08);
-  vec3 rayTint = mix(mix(uC1,vec3(1.0,0.98,0.94),0.45), triPalette(uR2.x + n1*0.4), 0.38);
-  sabattier = screenBlend(sabattier, rayTint * rayField * (0.16+0.30*amt));
+  float ray0=lineGlow(p,ang0,mix(-0.16,0.16,uH0.x),mix(0.022,0.075,uH0.y));
+  float rayTexture=smoothstep(0.47,0.90,n0+0.18*n1+0.08);
+  float rayField=ray0*rayTexture*rayGate;
+  vec3 rayTint=mix(mix(uC1,vec3(1.0,0.985,0.95),0.58),triPalette(uR2.x+n1*0.30),0.24);
+  sabattier=screenBlend(sabattier,rayTint*rayField*(0.11+0.23*amt));
 
-  float clipLift = reverseBand*(0.16+0.55*amt)*(0.62+0.38*ch) + rayField*(0.04+0.12*amt);
-  sabattier = mix(sabattier, vec3(1.0), clipLift*(1.0-y*0.35));
-  sabattier = mix(sabattier, hsvShiftLike(sabattier, uR2.y*0.6+n0*0.1), 0.22+0.22*ch);
+  float localBloom=smoothstep(0.60,0.96,y+n0*0.18)*smoothstep(0.42,0.90,n1+n0*0.28);
+  sabattier=screenBlend(sabattier,mix(vec3(1.0),uC2,0.10)*localBloom*(0.08+0.18*amt));
 
-  float grain = (hash21(floor(uv*uResolution)+uSeed*19.0)-0.5) * (0.010+0.010*amt);
-  sabattier += vec3(grain);
-  sabattier = preserveSource(base, sabattier);
-  sabattier = softShoulder(sabattier);
-  gl_FragColor = vec4(clamp(sabattier,0.0,1.0),1.0);
+  float clipLift=reverseBand*(0.17+0.56*amt)*(0.62+0.38*ch)+rayField*(0.025+0.075*amt)+localBloom*(0.025+0.08*amt);
+  sabattier=mix(sabattier,vec3(1.0),clipLift*(1.0-y*0.35));
+  sabattier=mix(sabattier,hsvShiftLike(sabattier,uR2.y*0.6+n0*0.1),0.22+0.22*ch);
+
+  float grain=(hash21(floor(uv*uResolution)+uSeed*19.0)-0.5)*(0.010+0.010*amt);
+  sabattier+=vec3(grain);
+  sabattier=preserveSource(base,sabattier);
+  sabattier=softShoulder(sabattier);
+  gl_FragColor=vec4(clamp(sabattier,0.0,1.0),1.0);
 }`;
 
 const CHEMICAL_FRAG = COMMON + `
@@ -192,59 +197,76 @@ void main(){
   gl_FragColor = vec4(clamp(outc,0.0,1.0),1.0);
 }`;
 
-const CONTACT_FRAG = COMMON + `
+const PHOTOGRAM_FRAG = COMMON + `
+float exposureField(vec2 p, float seedA, float seedB){
+  vec2 w=vec2(
+    fbm4(rot2(p,0.62)*1.8+vec2(seedA,7.0))-0.5,
+    fbm4(rot2(p,-0.78)*1.9+vec2(13.0,seedB))-0.5
+  );
+  vec2 q=rot2(p+w*0.20,mix(-1.2,1.2,uH0.x));
+  q*=vec2(mix(0.82,1.48,uH1.x),mix(1.20,2.35,uH1.y));
+  float broad=fbm6(q*2.05+vec2(seedA*0.7,seedB*0.4));
+  float detail=fbm4(q*5.35+vec2(seedB*0.8,seedA*0.5));
+  float directional=0.5+0.5*sin((q.x*0.42+q.y)*mix(4.5,8.5,uH2.x)+broad*2.7);
+  return broad*0.72+detail*0.18+directional*0.10;
+}
 void main(){
   vec2 uv=vTexCoord;
   vec2 p=uv-0.5;
   vec3 base=texM(uv);
   float amt=uAmount, ch=uChance;
 
-  vec2 wa = vec2(fbm4(rot2(p, uR0.x*2.5-1.2)*2.2 + vec2(8.0,uSeed*0.012))-0.5,
-                 fbm4(rot2(p,-uR0.y*2.3+1.1)*2.0 + vec2(uSeed*0.014,21.0))-0.5);
-  vec2 wb = vec2(fbm4(rot2(p, uR0.z*2.8-1.4)*3.8 + vec2(27.0,uSeed*0.016))-0.5,
-                 fbm4(rot2(p,-uR0.w*2.4+1.0)*3.4 + vec2(uSeed*0.018,37.0))-0.5);
+  float f0=exposureField(p,uSeed*0.021+3.0,uSeed*0.013+17.0);
+  float f1=exposureField(rot2(p,0.72)+vec2(0.08,-0.04),uSeed*0.017+29.0,uSeed*0.011+41.0);
+  float merged=max(f0*0.93,f1*0.76);
 
-  vec2 q0 = rot2(p + wa*0.18, mix(-1.1,1.1,uH0.x));
-  vec2 q1 = rot2(p + wb*0.16, mix(-1.4,1.4,uH0.y));
-  q0 *= vec2(mix(0.9,1.6,uH1.x), mix(1.3,2.4,uH1.y));
-  q1 *= vec2(mix(1.2,2.2,uH1.z), mix(0.8,1.9,uH1.w));
+  float threshold=mix(0.50,0.66,uR0.z);
+  float contact=smoothstep(threshold-0.10,threshold+0.075,merged);
+  float core=smoothstep(threshold+0.02,threshold+0.18,merged);
+  float halo=max(0.0,smoothstep(threshold-0.16,threshold-0.03,merged)-smoothstep(threshold+0.06,threshold+0.19,merged));
 
-  float n0 = fbm6(q0*2.2 + vec2(uSeed*0.011, 5.0));
-  float n1 = fbm4(q0*5.8 + vec2(14.0, uSeed*0.015));
-  float n2 = fbm6(q1*2.8 + vec2(33.0, uSeed*0.013));
-  float n3 = fbm4(q1*6.2 + vec2(uSeed*0.017, 41.0));
+  float filament=pow(ridge(0.5+0.5*sin((rot2(p,uR1.x*2.2-1.1).y+f1*0.17)*mix(18.0,42.0,uR1.y))),14.0);
+  filament*=smoothstep(0.44,0.78,f0)*smoothstep(0.32,0.86,fbm4(p*2.4+vec2(uSeed*0.014,61.0)));
+  contact=sat(contact+filament*(0.10+0.24*ch));
 
-  float m0 = smoothstep(0.50,0.82, n0*0.82 + n1*0.24 - length(q0)*0.28);
-  float m1 = smoothstep(0.54,0.84, n2*0.78 + n3*0.26 - dot(abs(q1),vec2(0.24,0.16)));
+  vec2 px=vec2(1.0)/uResolution;
+  vec2 drift=vec2(fbm4(p*2.7+vec2(71.0,uSeed*0.01))-0.5,fbm4(p*2.5+vec2(uSeed*0.013,83.0))-0.5);
+  vec3 displaced=texM(uv+drift*px*mix(4.0,18.0,amt)*contact);
 
-  float strand0 = lineGlow(q0, mix(-1.5,1.5,uR1.x), (n1-0.5)*0.22, mix(0.006,0.026,uR1.y));
-  float strand1 = lineGlow(q1, mix(-1.2,1.2,uR1.z), (n3-0.5)*0.18, mix(0.004,0.022,uR1.w));
-  float threadField = sat(strand0*0.62 + strand1*0.58) * smoothstep(0.34,0.84,n0+n2*0.3);
+  float family=floor(uR2.w*5.0);
+  vec3 negative=vec3(1.0)-displaced;
+  float yd=lum(displaced);
+  vec3 silver=mix(vec3(yd),mix(uC1,uC2,0.55),0.08+0.08*uR2.x);
+  vec3 paper=mix(vec3(0.98,0.97,0.93),uC2,0.08+0.07*uR2.y);
+  vec3 treated=displaced;
 
-  float shadow = sat(max(m0*0.88, m1*0.82) + threadField*0.26);
-  float edgeBand = max(0.0, smoothstep(0.34,0.60,shadow) - smoothstep(0.60,0.88,shadow));
-  float exposureFog = smoothstep(0.26,0.88, fbm4(rot2(p,0.35)*2.0 + vec2(uSeed*0.02,71.0)) + (1.0-shadow)*0.24 - length(p)*0.10);
-  float paperLift = smoothstep(0.44,0.92, exposureFog + edgeBand*0.42);
+  if(family<1.0){
+    treated=mix(displaced,paper,0.48+0.34*amt);
+  }else if(family<2.0){
+    treated=mix(displaced,negative,0.44+0.40*amt);
+  }else if(family<3.0){
+    treated=mix(displaced,silver,0.58+0.30*amt);
+  }else if(family<4.0){
+    treated=mix(displaced,hsvShiftLike(negative,uR1.z*0.52+f0*0.14),0.34+0.38*amt);
+  }else{
+    vec3 pale=mix(displaced,paper,0.34+0.34*amt);
+    treated=mix(pale,negative,0.16+0.22*ch);
+  }
 
-  vec3 exposed = mix(base, hsvShiftLike(base, uH2.x*0.68 + n2*0.18), 0.12 + 0.28*amt);
-  exposed = mix(exposed, exposed.bgr, (0.05+0.12*ch) * smoothstep(0.0,0.45,1.0-lum(base)));
+  vec3 outc=mix(base,treated,contact*(0.48+0.44*amt));
+  vec3 edgeTone=mix(vec3(1.0),mix(uC0,uC1,0.5),0.10);
+  outc=screenBlend(outc,edgeTone*halo*(0.12+0.28*amt));
+  outc=mix(outc,vec3(1.0),halo*(0.04+0.11*amt)*(1.0-lum(base)*0.38));
 
-  vec3 shadowTint = mix(vec3(0.10,0.10,0.11), mix(uC0,uC1,0.5), 0.18);
-  vec3 paperTint = mix(vec3(1.0,0.985,0.95), mix(uC1,uC2,0.5), 0.16);
-  vec3 contact = exposed;
+  float blocked=(1.0-core)*contact;
+  outc*=1.0-blocked*(0.025+0.10*amt)*(0.55+0.45*ch);
 
-  contact = mix(contact, contact*mix(0.20,0.70,uH2.y) + shadowTint*0.08, shadow*(0.34+0.40*amt));
-  contact = screenBlend(contact, paperTint * edgeBand * (0.16+0.34*amt));
-  contact = mix(contact, vec3(1.0), edgeBand*(0.06+0.14*amt)*(1.0-lum(base)*0.32));
-  contact = screenBlend(contact, paperTint * paperLift * (0.08+0.18*ch) * (1.0-shadow*0.68));
-
-  float powder = pow(hash21(floor(uv*uResolution*0.16)+uSeed*13.0), 12.0) * (0.04+0.10*amt) * (shadow + edgeBand);
-  contact = mix(contact, vec3(0.96,0.94,0.88), powder);
-  contact += vec3((hash21(floor(uv*uResolution)+uSeed*43.0)-0.5) * (0.006+0.008*amt));
-  contact = mix(contact, hsvShiftLike(contact, uH2.z*0.54 + exposureFog*0.12), 0.10+0.18*ch);
-  contact = preserveSource(base, contact);
-  contact = softShoulder(contact);
-  gl_FragColor = vec4(clamp(contact,0.0,1.0),1.0);
+  float dust=pow(hash21(floor(uv*uResolution*0.13)+uSeed*17.0),17.0)*contact*(0.035+0.070*amt);
+  outc=mix(outc,paper,dust);
+  outc+=vec3((hash21(floor(uv*uResolution)+uSeed*47.0)-0.5)*(0.006+0.008*amt));
+  outc=preserveSource(base,outc);
+  outc=softShoulder(outc);
+  gl_FragColor=vec4(clamp(outc,0.0,1.0),1.0);
 }`;
 
 const PALETTES = [
@@ -260,7 +282,7 @@ const FAMILIES = {
   SOLAR:['SABATTIER','METALLIC','FLASHLINE','PARTIAL NEGATIVE','OVEREXPOSE'],
   CHEMICAL:['BLEACH BATH','DYE FAILURE','DEVELOPER SURGE','CROSS BATH','SILVER RESIDUE'],
   REGISTER:['OFFSET','SLIT','DOUBLE', 'MISALIGN', 'PLATE SHIFT'],
-  CONTACT:['CONTACT BURN','SHADOW TRACE','PHOTOGRAM','PAPER GHOST','EXPOSURE IMPRINT']
+  PHOTOGRAM:['CONTACT WHITE','NEGATIVE SHADOW','SILVER CONTACT','COLOR NEGATIVE','PALE EXPOSURE']
 };
 
 let ui = {};
@@ -275,7 +297,7 @@ function setup(){
     APP.shaders.SOLAR = createShader(VERT, SOLAR_FRAG);
     APP.shaders.CHEMICAL = createShader(VERT, CHEMICAL_FRAG);
     APP.shaders.REGISTER = createShader(VERT, REGISTER_FRAG);
-    APP.shaders.CONTACT = createShader(VERT, CONTACT_FRAG);
+    APP.shaders.PHOTOGRAM = createShader(VERT, PHOTOGRAM_FRAG);
     APP.recipe = makeRecipe(APP.mode);
     APP.ready = true;
     wireUI();
@@ -410,13 +432,21 @@ function toggleEdit(){
 function makeRecipe(mode){
   const rnd=()=>Math.random();
   const p=PALETTES[Math.floor(rnd()*PALETTES.length)];
-  const fam=FAMILIES[mode][Math.floor(rnd()*FAMILIES[mode].length)];
-  return {
+  const familyIndex=Math.floor(rnd()*FAMILIES[mode].length);
+  const fam=FAMILIES[mode][familyIndex];
+  const recipe={
     seed:rnd()*99,
     h0:[rnd(),rnd(),rnd(),rnd()], h1:[rnd(),rnd(),rnd(),rnd()], h2:[rnd(),rnd(),rnd(),rnd()],
     r0:[rnd(),rnd(),rnd(),rnd()], r1:[rnd(),rnd(),rnd(),rnd()], r2:[rnd(),rnd(),rnd(),rnd()],
     c0:p.c0, c1:p.c1, c2:p.c2, palette:p.name, family:fam, id:Math.floor(1+rnd()*98)
   };
+  if(mode==='SOLAR'){
+    recipe.r2[3]=fam==='FLASHLINE' ? 0.96+rnd()*0.04 : rnd()*0.72;
+  }
+  if(mode==='PHOTOGRAM'){
+    recipe.r2[3]=(familyIndex+0.18+rnd()*0.54)/FAMILIES.PHOTOGRAM.length;
+  }
+  return recipe;
 }
 
 function updateVariation(){
@@ -445,7 +475,7 @@ function shaderSourceFor(mode){
   if(mode==='SOLAR') return SOLAR_FRAG;
   if(mode==='CHEMICAL') return CHEMICAL_FRAG;
   if(mode==='REGISTER') return REGISTER_FRAG;
-  return CONTACT_FRAG;
+  return PHOTOGRAM_FRAG;
 }
 
 function renderPreview(){
