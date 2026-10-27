@@ -1,40 +1,20 @@
-v0.2.8 Graphic UI Refresh
+# INCIDENT ARCHIVE v0.2.9 · EDITORIAL GUI
 
-# Incident Archive v0.2.7.1 — Preview Density Fix
+This is a GUI-only revision of v0.2.8.
 
-- Fixes preview-only edge stretching on Retina / high-DPI displays.
-- Keeps original image aspect ratio.
-- Export behavior and all four engine algorithms are unchanged from v0.2.4.
-- Preview shader resolution now uses the physical WEBGL drawing-buffer size.
+- Photo engines unchanged: SOLAR / CHEMICAL / REGISTER / LEAK.
+- Redesigned single-column responsive interface, inspired by muted grey/lavender typography and a magenta action accent.
+- Original photo aspect ratio preserved in preview and high-resolution PNG export.
+- The top-right three-line icon **opens the photo picker**; it is not an inert menu.
+- MUTATE / EDIT / SAVE buttons are operational; BACK remains available in the metadata strip.
+- Edit panel retains AMOUNT / CHANCE / PRESERVE / export resolution.
+- Metadata displays filename and file modified date (not EXIF capture date).
+- PWA icon, theme, asset URLs, and Service Worker cache refreshed.
 
-Incident Archive v0.2.4
+## Deployment
 
-- aspect-ratio preserved for landscape / portrait images
-- mirrored edge extension removed
-- preview fits image naturally inside stage
+Unzip the GitHub replacement ZIP into the **root** of your GitHub Pages repository, overwriting the previous files. After publishing, open the page again in Safari. For Safari's installed home-screen version, reopening may be needed for the updated Service Worker to activate.
 
-# Incident Archive v0.2.3 — UV FIX
+## Files
 
-This revision fixes the center seam and large triangular discontinuities visible in CHEMICAL output.
-
-## What changed
-- CHEMICAL processing recipe remains the v0.2.0 FIX version.
-- Texture coordinates now come from fragment pixel coordinates (`gl_FragCoord`) instead of interpolated plane mesh UVs.
-- The same seam-safe coordinate path is used by all four engines.
-- Service Worker cache updated to v0.2.3 and code assets use network-first loading.
-
-## Modes
-- SOLAR
-- CHEMICAL
-- REGISTER
-- LEAK
-
-
-## v0.2.7.1 tuning
-- SOLAR: intensity slightly reduced for better usability on portraits while keeping optical flare/ray behavior.
-- CHEMICAL: softened destructive drift and tuned dye behavior for higher hit-rate on people.
-- REGISTER: kept close to v0.2.5 with minor subject protection.
-- LEAK: renamed from PHOTOGRAM and reworked toward large color-leak / film-burn behavior with bold field overlays, differentiated from CHEMICAL and REGISTER.
-
-
-- v0.2.7.1: stronger mode output, full-image color filtering, and richer whole-photo tone changes while keeping the same 4-mode structure.
+`index.html`, `style.css`, `sketch.js`, `sw.js`, `manifest.webmanifest`, and `icons/`.

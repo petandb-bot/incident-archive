@@ -1,20 +1,9 @@
-v0.2.8 Graphic UI Refresh
+# Incident Archive v0.2.9 GUI implementation
 
-# Incident Archive v0.2.3 — Rendering correction
+Baseline: v0.2.8 LEAK_MODE. GLSL shader source and recipe families are preserved verbatim.
 
-Observed defect: exported CHEMICAL images showed a hard vertical seam at the exact image midpoint and large diagonal triangle boundaries.
+Responsive main composition: masthead → image canvas/empty state → four horizontally spaced mode tabs → filename/date/BACK → three main actions → magenta footer strip. Edit drawer expands below actions.
 
-Diagnosis: the CHEMICAL shader source itself was unchanged from v0.2.0; the artifact came from geometry-interpolated texture coordinates.
+The preview and export dimensions remain based on original image aspect ratio. The preview uses the previous high-DPI `uResolution` correction. The header's menu motif triggers the actual OPEN file picker.
 
-Fix:
-- Added `screenUV()` based on `gl_FragCoord / uResolution`.
-- All fragment engines now sample image coordinates through `screenUV()`.
-- CHEMICAL's actual processing math remains unchanged except for the UV source.
-- Updated service-worker cache key and network-first handling for HTML/JS/CSS.
-
-
-## v0.2.7.1 tuning
-- SOLAR: intensity slightly reduced for better usability on portraits while keeping optical flare/ray behavior.
-- CHEMICAL: softened destructive drift and tuned dye behavior for higher hit-rate on people.
-- REGISTER: kept close to v0.2.5 with minor subject protection.
-- LEAK: renamed from PHOTOGRAM and reworked toward large color-leak / film-burn behavior with bold field overlays, differentiated from CHEMICAL and REGISTER.
+No static photo is bundled. Opening a photo replaces the graphic placeholder with the processed photo, preserving its dimensions.

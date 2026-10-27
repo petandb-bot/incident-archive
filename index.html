@@ -2,109 +2,99 @@
 <html lang="en" data-mode="solar">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <meta name="theme-color" content="#eceae6">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#c1c8dd">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Incident Archive">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="description" content="Incident Archive — chance-driven photographic incidents with graphic minimal UI and leak mode">
+  <meta name="description" content="Incident Archive — photographic chance engine">
   <title>Incident Archive</title>
-  <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="apple-touch-icon" href="./icons/icon-180.png">
-  <link rel="stylesheet" href="./style.css?v=0280">
+  <link rel="manifest" href="./manifest.webmanifest?v=0290">
+  <link rel="apple-touch-icon" href="./icons/icon-180.png?v=0290">
+  <link rel="stylesheet" href="./style.css?v=0290">
 </head>
 <body>
-  <div class="ambient" aria-hidden="true"><i></i><i></i><i></i></div>
   <main class="app-shell">
     <header class="masthead">
-      <div class="wordmark"><span>INCIDENT</span><span>ARCHIVE</span></div>
-      <span class="version">0.2.8</span>
-      <button id="openPhotoTop" class="open-top" type="button">OPEN</button>
+      <div class="wordmark" aria-label="Incident Archive"><span>INCIDENT</span><span>ARCHIVE</span></div>
+      <span class="version">0.2.9</span>
+      <button id="openPhotoTop" class="open-top" type="button" title="Open a photo" aria-label="Open a photo">
+        <span class="menu-lines" aria-hidden="true"><i></i><i></i><i></i></span>
+      </button>
     </header>
 
-    <section class="image-world" id="stage" aria-label="image stage">
+    <section class="image-world" id="stage" aria-label="Photograph preview">
       <div id="canvasMount" class="canvas-mount"></div>
       <div id="emptyState" class="empty-state">
-        <div class="empty-poster" aria-hidden="true">
-          <div class="poster-aura"></div>
-          <div class="poster-frame">
-            <div class="poster-grid"></div>
-            <div class="poster-panel poster-panel-a"></div>
-            <div class="poster-panel poster-panel-b"></div>
-            <div class="poster-window">
-              <div class="poster-window-mark"></div>
-              <div class="poster-window-lines"></div>
-              <div class="poster-window-dots"></div>
-            </div>
-            <div class="poster-legend-top"><span>INCIDENT / ARCHIVE</span><span>OPTICAL INDEX</span></div>
-            <div class="poster-legend-bottom"><span>LIGHT / COLOR / TRACE / LEAK</span><span>READY FOR INPUT</span></div>
-          </div>
-          <div class="poster-icons">
-            <div class="poster-icon-card"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="7" y="7" width="34" height="34" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M24 10v28M10 24h28" stroke="currentColor" stroke-width="1.25" opacity=".52"/><circle cx="24" cy="24" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M24 5.8v5.4M24 36.8v5.4M5.8 24h5.4M36.8 24h5.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="square"/></svg><span>SOLAR</span></div>
-            <div class="poster-icon-card"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="7" y="7" width="34" height="34" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M16 14h16l4 9c-2.8 4.5-6.8 8.8-12 11.2C18.8 31.8 14.8 27.5 12 23l4-9Z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M15 22h18" stroke="currentColor" stroke-width="1.2" opacity=".55"/></svg><span>CHEMICAL</span></div>
-            <div class="poster-icon-card"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="7" y="7" width="34" height="34" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="14.5" y="15" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="19.5" y="19" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" opacity=".6"/><path d="M14.5 34h19" stroke="currentColor" stroke-width="1.2" opacity=".55"/></svg><span>REGISTER</span></div>
-            <div class="poster-icon-card"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="7" y="7" width="34" height="34" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="12" y="18" width="24" height="12" fill="currentColor" opacity=".08"/><path d="M13 18h22v12H13z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M13 24h22" stroke="currentColor" stroke-width="1.2" opacity=".55"/><path d="M9 21h6M33 27h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>LEAK</span></div>
-          </div>
-        </div>
-        <button id="openPhotoPrimary" class="open-primary" type="button">OPEN</button>
+        <div class="empty-glow" aria-hidden="true"></div>
+        <div class="empty-copy"><span class="empty-index">I / A · 029</span><span class="empty-heading">AN IMAGE<br>CAN BECOME<br>AN INCIDENT.</span></div>
+        <button id="openPhotoPrimary" class="open-primary" type="button">
+          <svg viewBox="0 0 28 28" aria-hidden="true"><path d="M14 5v18M5 14h18" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
+          <span>OPEN PHOTO</span>
+        </button>
       </div>
-      <div id="renderOverlay" class="render-overlay" hidden><span class="activity-indicator"></span><span id="renderLabel">MUTATING</span></div>
+      <div id="renderOverlay" class="render-overlay" hidden>
+        <span class="activity-indicator"></span><span id="renderLabel">RENDERING</span>
+      </div>
     </section>
 
-    <section class="control-sheet" aria-label="Incident Archive controls">
-      <nav class="modes" role="group" aria-label="mode">
-        <button class="mode active" data-mode="SOLAR" type="button" aria-pressed="true"><span>SOLAR</span></button>
-        <button class="mode" data-mode="CHEMICAL" type="button" aria-pressed="false"><span>CHEMICAL</span></button>
-        <button class="mode" data-mode="REGISTER" type="button" aria-pressed="false"><span>REGISTER</span></button>
-        <button class="mode" data-mode="LEAK" type="button" aria-pressed="false"><span>LEAK</span></button>
-      </nav>
+    <nav class="modes" role="group" aria-label="Photo processing mode">
+      <button class="mode active" data-mode="SOLAR" type="button" aria-pressed="true">SOLAR</button>
+      <button class="mode" data-mode="CHEMICAL" type="button" aria-pressed="false">CHEMICAL</button>
+      <button class="mode" data-mode="REGISTER" type="button" aria-pressed="false">REGISTER</button>
+      <button class="mode" data-mode="LEAK" type="button" aria-pressed="false">LEAK</button>
+    </nav>
 
-      <button id="mutateButton" class="mutate-button" type="button"><span>MUTATE</span></button>
+    <div class="photo-meta" aria-label="Photo information">
+      <span id="fileMeta">NO IMAGE SELECTED</span>
+      <button id="backButton" class="back-button" type="button" disabled>BACK</button>
+      <span id="dateMeta">INCIDENT / ARCHIVE</span>
+    </div>
 
-      <div class="utility-row">
-        <button id="backButton" class="utility" type="button" disabled>BACK</button>
-        <button id="editToggle" class="utility" type="button" aria-expanded="false" aria-controls="editPanel">EDIT <span id="editChevron">＋</span></button>
-        <button id="saveButton" class="utility" type="button" disabled>SAVE</button>
+    <section class="control-sheet" aria-label="Photo controls">
+      <div class="action-row">
+        <button id="mutateButton" class="action action-mutate" type="button" aria-label="Mutate photo">
+          <svg class="action-icon" viewBox="0 0 80 64" aria-hidden="true">
+            <rect x="30" y="6" width="30" height="30" fill="var(--hot-soft)" opacity=".83"/>
+            <rect x="18" y="24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8"/>
+          </svg>
+          <span>MUTATE</span>
+        </button>
+        <button id="editToggle" class="action action-edit" type="button" aria-expanded="false" aria-controls="editPanel" aria-label="Toggle edit parameters">
+          <svg class="action-icon" viewBox="0 0 80 64" aria-hidden="true">
+            <path d="M15 16h50M15 32h50M15 48h50" fill="none" stroke="currentColor" stroke-width="1.9"/>
+            <circle cx="36" cy="16" r="5.4" fill="var(--paper)" stroke="currentColor" stroke-width="1.9"/>
+            <circle cx="49" cy="32" r="5.4" fill="var(--paper)" stroke="var(--hot)" stroke-width="1.9"/>
+            <circle cx="30" cy="48" r="5.4" fill="var(--paper)" stroke="currentColor" stroke-width="1.9"/>
+          </svg>
+          <span>EDIT <small id="editChevron" aria-hidden="true">+</small></span>
+        </button>
+        <button id="saveButton" class="action action-save" type="button" disabled aria-label="Save processed photo">
+          <svg class="action-icon" viewBox="0 0 80 64" aria-hidden="true">
+            <path d="M40 5v36M25 29l15 15 15-15M18 56h44" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="miter"/>
+          </svg>
+          <span>SAVE</span>
+        </button>
       </div>
-
       <section id="editPanel" class="edit-panel" hidden>
-        <div class="parameter">
-          <div class="parameter-head"><label for="amountSlider">AMOUNT</label><output id="amountValue">88</output></div>
-          <input id="amountSlider" type="range" min="0" max="100" value="88" step="1">
-        </div>
-        <div class="parameter">
-          <div class="parameter-head"><label for="chanceSlider">CHANCE</label><output id="chanceValue">80</output></div>
-          <input id="chanceSlider" type="range" min="0" max="100" value="80" step="1">
-        </div>
-        <div class="parameter">
-          <div class="parameter-head"><label for="preserveSlider">PRESERVE</label><output id="preserveValue">22</output></div>
-          <input id="preserveSlider" type="range" min="0" max="100" value="22" step="1">
-        </div>
-        <div class="export-row">
-          <label for="exportSize">SIZE</label>
-          <select id="exportSize">
-            <option value="1800">1800</option>
-            <option value="2600" selected>2600</option>
-            <option value="3200">3200</option>
-          </select>
-        </div>
+        <div class="parameter"><div class="parameter-head"><label for="amountSlider">AMOUNT</label><output id="amountValue">88</output></div><input id="amountSlider" type="range" min="0" max="100" value="88" step="1"></div>
+        <div class="parameter"><div class="parameter-head"><label for="chanceSlider">CHANCE</label><output id="chanceValue">80</output></div><input id="chanceSlider" type="range" min="0" max="100" value="80" step="1"></div>
+        <div class="parameter"><div class="parameter-head"><label for="preserveSlider">PRESERVE</label><output id="preserveValue">22</output></div><input id="preserveSlider" type="range" min="0" max="100" value="22" step="1"></div>
+        <div class="export-row"><label for="exportSize">EXPORT SIZE</label><select id="exportSize"><option value="1800">1800 PX</option><option value="2600" selected>2600 PX</option><option value="3200">3200 PX</option></select></div>
       </section>
     </section>
 
-    <div class="engine-hooks" aria-hidden="true">
-      <span id="statusText">READY / ADD A PHOTO</span>
-      <span id="variationMeta">INCIDENT / —</span>
-    </div>
+    <div class="footer-bar" aria-hidden="true"><span></span><span></span></div>
+    <div class="engine-hooks" aria-hidden="true"><span id="statusText">READY / ADD A PHOTO</span><span id="variationMeta">INCIDENT / —</span></div>
     <div id="errorPanel" class="error-panel" role="alert" hidden><strong>IMAGE ERROR</strong><span id="errorDetail"></span></div>
   </main>
-
   <input id="photoInput" type="file" accept="image/*" hidden>
   <script src="https://cdn.jsdelivr.net/npm/p5@1.11.13/lib/p5.min.js"></script>
-  <script src="./sketch.js?v=0280"></script>
+  <script src="./sketch.js?v=0290"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).catch(console.warn));
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=0290', {updateViaCache:'none'}).catch(console.warn));
     }
   </script>
 </body>

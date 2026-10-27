@@ -3,7 +3,7 @@
 window.IA_SCRIPT_LOADED = true;
 
 const APP = {
-  version: '0.2.8',
+  version: '0.2.9',
   mode: 'SOLAR',
   params: { amount: 88, chance: 80, preserve: 22 },
   recipe: null,
@@ -454,6 +454,7 @@ function handleFile(e){
     URL.revokeObjectURL(url);
     APP.source=img;
     APP.sourceName=file.name||'photo';
+    updatePhotoMeta(file);
     APP.history=[];
     APP.recipe=makeRecipe(APP.mode);
     fitPreviewCanvas(img.width,img.height);
@@ -485,6 +486,17 @@ function computePreviewFit(srcW, srcH){
     offsetX: (mountW - fitW) * 0.5,
     offsetY: (mountH - fitH) * 0.5
   };
+}
+
+function updatePhotoMeta(file){
+  const fileMeta=document.getElementById('fileMeta');
+  const dateMeta=document.getElementById('dateMeta');
+  if(fileMeta) fileMeta.textContent=(file.name||'PHOTO').toUpperCase();
+  if(dateMeta){
+    const d=new Date(file.lastModified||Date.now());
+    const two=n=>String(n).padStart(2,'0');
+    dateMeta.textContent=`${d.getFullYear()}.${two(d.getMonth()+1)}.${two(d.getDate())}  ${two(d.getHours())}:${two(d.getMinutes())}`;
+  }
 }
 
 function fitPreviewCanvas(w,h){

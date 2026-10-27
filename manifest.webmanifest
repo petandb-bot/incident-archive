@@ -2,8 +2,8 @@
   "name": "Incident Archive",
   "short_name": "Incident",
   "display": "standalone",
-  "background_color": "#eceae6",
-  "theme_color": "#eceae6",
+  "background_color": "#c1c8dd",
+  "theme_color": "#c1c8dd",
   "start_url": "./index.html",
   "scope": "./",
   "icons": [
@@ -23,5 +23,5 @@
       "type": "image/png"
     }
   ],
-  "description": "Incident Archive v0.2.7.2 — chance-driven photographic incidents with refined graphic UI"
+  "description": "Incident Archive v0.2.9 \u2014 editorial UI, chance-driven photographic incidents."
 }
