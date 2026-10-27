@@ -1,30 +1,43 @@
-# INCIDENT ARCHIVE v0.2.9.1 · EDITORIAL GUI
+# INCIDENT ARCHIVE v0.2.9.2 — CHEMICAL / LEAK 修正
 
-This is a GUI-only revision of v0.2.8.
+ベース：ユーザー提供 v0.2.9.1（iPhone Safari / GitHub Pages 用）
 
-- Photo engines unchanged: SOLAR / CHEMICAL / REGISTER / LEAK.
-- Redesigned single-column responsive interface, inspired by muted grey/lavender typography and a magenta action accent.
-- Original photo aspect ratio preserved in preview and high-resolution PNG export.
-- The top-right three-line icon **opens the photo picker**; it is not an inert menu.
-- MUTATE / EDIT / SAVE buttons are operational; BACK remains available in the metadata strip.
-- Edit panel retains AMOUNT / CHANCE / PRESERVE / export resolution.
-- Metadata displays filename and file modified date (not EXIF capture date).
-- PWA icon, theme, asset URLs, and Service Worker cache refreshed.
+## 今回の変更
 
-## Deployment
+### CHEMICAL
+- 化学処理の分布を連続した2Dノイズ（現像液の濃淡、染料の欠落、漂白）に整理。
+- 中央で切れたように見える境界を作らない設計に変更。強い輪郭増幅と漂白を抑制。
+- 写真の構造を保持しつつ、局所的な色移りと乳剤のムラは継続。
 
-Unzip the GitHub replacement ZIP into the **root** of your GitHub Pages repository, overwriting the previous files. After publishing, open the page again in Safari. For Safari's installed home-screen version, reopening may be needed for the updated Service Worker to activate.
+### LEAK
+- 平行バンド／中央のリビール帯／高輝度の細いコアを廃止。
+- 写真端からにじむ二つの広い楕円状の光漏れに変更。輪郭は連続的に減衰し、乱数による変形量にも上限を設定。
+- 赤・橙・桃色のフィルム漏光は維持し、白飛び・複数の加算発光を抑制。
 
-## Files
+### PNG エクスポート（両モードを含む全モード）
+- 旧版は WebGL 描画後に `setTimeout(80)` で一度処理を中断し、その後 WebGL キャンバスを直接 `toBlob()` していた。
+- WebGL 描画バッファが中断後に保持されない環境では、保存画像に欠落や三角形状の乱れが混入する可能性がある。
+- 今回は、WebGL 描画完了直後、**最初の `await` より前に**一時 2D キャンバスへ同期コピーして内容を固定し、その2DキャンバスからPNGを作成。
+- これは元画像に存在する線を消すフィルターではなく、保存処理由来の描画欠落を防ぐ対策。
 
-`index.html`, `style.css`, `sketch.js`, `sw.js`, `manifest.webmanifest`, and `icons/`.
+## 維持した内容
 
+- **SOLAR / REGISTER** のシェーダー
+- 4モード構成、GUI、各ボタン、AMOUNT / CHANCE / PRESERVE、MUTATE / BACK
+- 元画像の縦横比、1800 / 2600 / 3200pxの出力選択、iPhone共有・PNG保存処理
+- p5.js 1.11.13
 
-## v0.2.9.1 — LEAK soft-edge refinement
-- SOLAR, CHEMICAL, REGISTER: shader contents unchanged.
-- LEAK: replaced flat/hard exposure bands with broad optical falloff.
-- Slight low-frequency edge drift removes unnaturally straight boundaries.
-- Reduced the thin reveal stripe and used a continuous union for overlapping leak fields.
-- Preserved the existing strong red/orange/pink film-burn feel and whole-photo color grading.
-- Editorial GUI, app icons, control positions, preview, aspect ratio and export remain unchanged.
-- Updated service-worker and asset versions to v0291.
+## GitHub Pages への配置
+
+1. このフォルダーの `index.html`, `style.css`, `sketch.js`, `sw.js`, `manifest.webmanifest` を、リポジトリの既存ファイルに**上書き**。
+2. 元の `icons/` ディレクトリは**削除しない**。アイコンの現物は今回の添付には含まれていないため、更新対象外とした。
+3. GitHub Pagesの公開が反映されたら Safari で再読み込み。ホーム画面に追加したアプリが古い場合、一度閉じて再起動し、必要ならホーム画面から削除→再追加。
+4. ヘッダーに `0.2.9.2` と表示されることを確認。
+
+## 確認状況
+
+- JavaScript の構文検査（Node.js）は通過。
+- シェーダーの構造と、元GUI/ボタンIDの保持をソース上で確認。
+- **実機iPhone SafariでのWebGL描画・PNG保存は未検証**。利用端末でMUTATE、CHEMICAL/LEAK、保存PNGを確認してください。
+
+元の `icons/` がリポジトリに無い場合は、従来のアイコンを別途復元してください。

@@ -3,7 +3,7 @@
 window.IA_SCRIPT_LOADED = true;
 
 const APP = {
-  version: '0.2.9.1',
+  version: '0.2.9.2',
   mode: 'SOLAR',
   params: { amount: 88, chance: 80, preserve: 22 },
   recipe: null,
@@ -157,49 +157,75 @@ void main(){
 
 const CHEMICAL_FRAG = COMMON + `
 void main(){
-  vec2 uv=screenUV();
-  vec2 p=uv-0.5;
-  vec3 base=texM(uv);
-  float amt=uAmount, ch=uChance;
+  vec2 uv = screenUV();
+  vec2 p = uv - 0.5;
+  vec3 base = texM(uv);
+  float amt = uAmount, ch = uChance;
   float guard = subjectGuard(uv, base);
 
-  vec2 drift = vec2(fbm4(p*1.8+uSeed*0.01)-0.5, fbm4(rot2(p,1.1)*1.7+uSeed*0.013)-0.5);
-  float driftK = (0.55+0.45*(1.0-guard));
-  vec3 rS=texM(uv+drift*0.012*(0.26+amt)*vec2(1.0,0.8)*driftK);
-  vec3 gS=texM(uv+drift*0.010*(0.24+amt)*vec2(-0.7,1.0)*driftK);
-  vec3 bS=texM(uv+drift*0.016*(0.20+ch)*vec2(0.9,-0.6)*driftK);
-  vec3 layer = vec3(rS.r, gS.g, bS.b);
+  // All chemical structures are continuous 2D fields. There are no vertical
+  // slit masks, half-frame divisions or scanline-dependent color branches.
+  vec2 k0 = rot2(p, (uR0.x-0.5)*1.35);
+  vec2 k1 = rot2(p, (uR0.y-0.5)*1.62);
+  float bathA = fbm6(k0*2.8 + vec2(7.0,uSeed*0.017));
+  float bathB = fbm4(k1*5.5 + vec2(uSeed*0.020,19.0));
+  float salt = fbm4(rot2(p,0.86)*4.2 + vec2(31.0,uSeed*0.022));
 
-  float chem0=fbm6(rot2(p,(uR0.x-0.5)*2.2)*3.0+vec2(7.0,uSeed*0.017));
-  float chem1=fbm4(rot2(p,(uR0.y-0.5)*1.6)*6.0+vec2(uSeed*0.02,19.0));
-  float bath = smoothstep(0.30,0.82,chem0*(0.75+0.50*chem1));
-  float bleach = smoothstep(0.58,0.92,chem1 + chem0*0.38);
-  float dyeFail = smoothstep(0.44,0.86,fbm4(p*4.0+vec2(31.0,uSeed*0.02)));
+  // Slowly changing dye and developer densities; broad ramps prevent
+  // straight boundaries and the abrupt mid-frame 'cut' of the old result.
+  float developer = smoothstep(0.23,0.77,bathA*0.82+bathB*0.27);
+  float dyeLoss   = smoothstep(0.26,0.80,salt*0.76+bathB*0.28);
+  float bleach    = smoothstep(0.49,0.92,bathA*0.34+bathB*0.68);
+  float stain     = sat(developer*0.70+dyeLoss*0.38);
 
-  vec3 cross = vec3(layer.g*0.82+layer.r*0.20, layer.b*0.74+layer.g*0.26, layer.r*0.78+layer.b*0.18);
-  vec3 spectral = mix(triPalette(chem0*0.78+uR1.x), mix(uC0,uC2,0.52), 0.26);
-  vec3 chem = mix(base, cross, bath*(0.34+0.48*amt)*(1.0-0.18*guard));
-  chem = mix(chem, spectral * vec3(0.90+lum(layer)*0.34), dyeFail*(0.16+0.32*ch));
-  chem = mix(chem, vec3(1.0), bleach*(0.08+0.26*amt)*(1.0-lum(base)*0.38));
+  vec2 drift = vec2(
+    fbm4(p*1.95 + vec2(uSeed*0.011,4.0))-0.5,
+    fbm4(rot2(p,1.07)*2.10 + vec2(17.0,uSeed*0.014))-0.5
+  );
+  drift *= (0.64+0.36*(1.0-guard));
+  vec3 rS = texM(uv+drift*0.009*(0.20+amt)*vec2(1.0,0.8));
+  vec3 gS = texM(uv+drift*0.007*(0.18+amt)*vec2(-0.7,1.0));
+  vec3 bS = texM(uv+drift*0.011*(0.16+ch)*vec2(0.9,-0.6));
+  vec3 layer = vec3(rS.r,gS.g,bS.b);
+  vec3 cross = vec3(layer.g*0.82+layer.r*0.20,
+                    layer.b*0.74+layer.g*0.26,
+                    layer.r*0.78+layer.b*0.18);
 
-  float edgeField=edge(uv,1.4/uResolution.x);
-  chem = screenBlend(chem, mix(vec3(1.0,0.98,0.95), uC1, 0.36) * (edgeField*bath) * (0.08+0.22*amt));
+  vec3 spectral = mix(triPalette(bathA*0.62+uR1.x),
+                      mix(uC0,uC2,0.52),0.36);
+  vec3 chem = mix(base,cross,developer*(0.27+0.39*amt)*(1.0-0.15*guard));
+  chem = mix(chem,spectral*(0.78+0.29*lum(layer)),
+             dyeLoss*(0.12+0.24*ch));
+  chem = mix(chem,vec3(0.99,0.97,0.91),
+             bleach*(0.045+0.145*amt)*(1.0-lum(base)*0.30));
 
-  vec3 lowShift = mix(vec3(lum(chem)), chem.bgr, 0.34+0.22*uR1.y);
-  chem = mix(chem, lowShift, smoothstep(0.0,0.40,1.0-lum(base))*(0.12+0.22*ch));
-  chem = mix(chem, hsvShiftLike(chem, chem1*0.26 + uR1.z*0.34), 0.14+0.22*amt);
+  // Fine emulsion response, never a high-contrast geometry outline.
+  float edgeField = edge(uv,1.0/max(uResolution.x,1.0));
+  chem = screenBlend(chem,mix(uC1,vec3(1.0,0.95,0.89),0.43)
+                       *edgeField*stain*(0.035+0.085*amt));
+  vec3 residue = mix(uC0,uC2,smoothstep(0.20,0.82,bathB));
+  chem = mix(chem,chem*mix(vec3(1.0),residue,0.22),
+             stain*(0.20+0.22*ch));
+  chem = mix(chem,hsvShiftLike(chem,bathB*0.24+uR1.z*0.30),
+             0.11+0.18*amt);
 
-  float sediment = pow(hash21(floor(uv*uResolution*0.12)+uSeed*11.0), 15.0) * bath * 0.10 * amt;
-  chem = mix(chem, vec3(0.96,0.93,0.86), sediment);
-  chem += vec3((hash21(floor(uv*uResolution)+uSeed*31.0)-0.5) * (0.007+0.008*amt));
-  chem = preserveSource(base, chem);
-  vec3 chemTone = paletteWash(chem, mix(uC0,vec3(0.92,0.82,0.74),0.32), mix(uC1,uC2,0.46), vec3(1.0,0.99,0.96), 0.34+0.30*amt);
-  chemTone = splitTone(chemTone, mix(uC0,uC2,0.48), mix(uC1,vec3(1.0),0.40), 0.18+0.22*ch);
-  chemTone = hueRotate(chemTone, (uR0.x-0.5)*0.28 + (chem1-0.5)*0.12);
-  chemTone = contrastSat(chemTone, 0.08+0.12*amt, 1.12+0.18*amt);
-  chem = mix(chem, chemTone, 0.48+0.26*amt);
+  float sediment = pow(hash21(floor(uv*uResolution*0.14)+uSeed*11.0),15.0)
+                   *stain*0.065*amt;
+  chem = mix(chem,vec3(0.96,0.93,0.86),sediment);
+  chem += vec3((hash21(floor(uv*uResolution)+uSeed*31.0)-0.5)
+               *(0.006+0.009*amt));
+
+  chem = preserveSource(base,chem);
+  vec3 tone = paletteWash(chem,mix(uC0,vec3(0.92,0.82,0.74),0.32),
+                          mix(uC1,uC2,0.46),vec3(1.0,0.99,0.96),
+                          0.31+0.28*amt);
+  tone = splitTone(tone,mix(uC0,uC2,0.48),
+                   mix(uC1,vec3(1.0),0.40),0.16+0.19*ch);
+  tone = hueRotate(tone,(uR0.x-0.5)*0.23+(bathB-0.5)*0.10);
+  tone = contrastSat(tone,0.065+0.10*amt,1.10+0.14*amt);
+  chem = mix(chem,tone,0.46+0.23*amt);
   chem = softShoulder(chem);
-  gl_FragColor = vec4(clamp(chem,0.0,1.0),1.0);
+  gl_FragColor=vec4(clamp(chem,0.0,1.0),1.0);
 }`;
 
 const REGISTER_FRAG = COMMON + `
@@ -251,126 +277,125 @@ void main(){
 
 
 const LEAK_FRAG = COMMON + `
-float bandSoft(float x, float c, float w, float blur){
-  // Wider C2-continuous shoulder: keep a bright core but eliminate the sharp seam.
-  float inner = w * 0.58;
-  float outer = w + blur * 1.52;
-  float t = clamp((abs(x - c) - inner) / max(outer - inner, 0.001), 0.0, 1.0);
-  return 1.0 - t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
-}
-vec3 leakRamp(float t, vec3 a, vec3 b, vec3 c){
-  vec3 ab = mix(a, b, smoothstep(0.0, 0.65, t));
-  return mix(ab, c, smoothstep(0.58, 1.0, t));
+// An optically broad, elliptical exposure field. No bands, slits, reveal
+// strips or intersecting rays: those produced paper-fold / cut-line shapes.
+float softExposure(vec2 p,vec2 radii){
+  vec2 d=p/max(radii,vec2(0.01));
+  float r=length(d);
+  return exp(-1.55*r*r);
 }
 void main(){
   vec2 uv = screenUV();
   vec2 p = uv - 0.5;
   vec3 base = texM(uv);
   float amt = uAmount, ch = uChance;
-  float guard = subjectGuard(uv, base);
+  float guard = subjectGuard(uv,base);
 
-  float angle = mix(-0.32, 0.32, uR0.x) + mix(-0.18, 0.18, uR0.y);
-  vec2 q = rot2(p, angle);
-  float n0 = fbm6(q * 1.8 + vec2(uSeed * 0.013, 13.0));
-  float n1 = fbm4(q * 4.6 + vec2(19.0, uSeed * 0.017));
-  float n2 = fbm4(rot2(q, 1.18) * 3.0 + vec2(uSeed * 0.011, 51.0));
-
-  float family = floor(uR2.w * 5.0);
-  float axis = (family < 2.0) ? q.y : q.x;
-  float crossAxis = (family < 2.0) ? q.x : q.y;
-
-  // Small low-frequency deviations remove geometrically straight, folded-paper edges.
-  float center = mix(-0.16, 0.16, uH0.x) + (n0 - 0.5) * 0.19 + (n2 - 0.5) * 0.045;
-  float width = mix(0.22, 0.48, uH0.y) * (0.72 + 0.52 * amt);
-  width *= mix(0.92, 1.08, n1);
-  float blur = mix(0.08, 0.22, uH1.x);
-  float band = bandSoft(axis, center, width, blur);
-
-  // The internal exposure strip should read as a glow, not a cut line.
-  float revealCenter = center + mix(-0.08, 0.08, uH2.x);
-  float reveal = bandSoft(axis, revealCenter, width * 0.26, blur * 0.94);
-  float hotCore = bandSoft(axis, center + mix(-0.03, 0.03, uH1.y), width * 0.19, blur * 0.96);
-  float haze = bandSoft(axis, center, width * 1.26, blur * 1.36);
-
-  float edgeTop = 1.0 - smoothstep(-0.52, 0.18, q.y);
-  float edgeBottom = smoothstep(-0.18, 0.52, q.y);
-  float edgeLeft = 1.0 - smoothstep(-0.52, 0.18, q.x);
-  float edgeRight = smoothstep(-0.18, 0.52, q.x);
-  float edgeAnchor = edgeTop;
-  if(family >= 1.0 && family < 2.0) edgeAnchor = edgeBottom;
-  if(family >= 2.0 && family < 3.0) edgeAnchor = edgeLeft;
-  if(family >= 3.0) edgeAnchor = edgeRight;
-
-  float spread = exp(-pow((crossAxis - mix(-0.24, 0.24, uR1.x)) / max(0.16, mix(0.22, 0.48, uR1.y)), 2.0));
-  float flare = edgeAnchor * spread;
-  // Smooth union avoids the ridge created where two exposure masks crossed.
-  float primary = clamp(band * (0.42 + 0.58 * edgeAnchor), 0.0, 1.0);
-  float spill = clamp(haze * flare * (0.36 + 0.34 * ch), 0.0, 1.0);
-  float leakMask = 1.0 - (1.0 - primary) * (1.0 - spill);
-
-  vec2 px = vec2(1.0) / uResolution;
-  vec2 flow = vec2(cos(angle + 1.5707963), sin(angle + 1.5707963));
-  vec3 bleedA = texM(uv + flow * px * mix(2.0, 10.0, amt) * (0.25 + 0.75 * leakMask));
-  vec3 bleedB = texM(uv - flow * px * mix(1.0, 7.0, ch) * (0.20 + 0.65 * leakMask));
-  vec3 bleedMix = vec3(bleedA.r, base.g, bleedB.b);
-
-  vec3 deepWarm = mix(vec3(0.62, 0.02, 0.04), uC0, 0.18);
-  vec3 redWarm  = mix(vec3(0.94, 0.06, 0.03), uC0, 0.24);
-  vec3 magentaWarm = mix(vec3(0.92, 0.18, 0.30), uC2, 0.28);
-  vec3 hotWarm  = mix(vec3(1.0, 0.82, 0.62), uC1, 0.20);
-  vec3 paperHot = mix(vec3(1.0, 0.98, 0.92), uC1, 0.08);
-
+  float family = floor(uR2.w*5.0);
+  bool horizontalEdge = (family < 2.0);
+  vec2 anchor;
+  vec2 tangent;
+  vec2 inward;
   if(family < 1.0){
-    redWarm = mix(redWarm, vec3(0.96, 0.08, 0.02), 0.28);
+    anchor=vec2(mix(0.20,0.80,uH0.x),-0.10);
+    tangent=vec2(1.0,0.0); inward=vec2(0.0,1.0);
   }else if(family < 2.0){
-    magentaWarm = mix(magentaWarm, vec3(0.98, 0.28, 0.14), 0.26);
+    anchor=vec2(mix(0.20,0.80,uH0.x),1.10);
+    tangent=vec2(1.0,0.0); inward=vec2(0.0,-1.0);
   }else if(family < 3.0){
-    deepWarm = mix(deepWarm, vec3(0.78, 0.00, 0.08), 0.28);
-  }else if(family < 4.0){
-    hotWarm = mix(hotWarm, vec3(1.0, 0.88, 0.70), 0.24);
+    anchor=vec2(-0.10,mix(0.20,0.80,uH0.x));
+    tangent=vec2(0.0,1.0); inward=vec2(1.0,0.0);
   }else{
-    magentaWarm = mix(magentaWarm, vec3(0.86, 0.08, 0.22), 0.24);
-    paperHot = mix(paperHot, vec3(1.0, 0.99, 0.96), 0.12);
+    anchor=vec2(1.10,mix(0.20,0.80,uH0.x));
+    tangent=vec2(0.0,1.0); inward=vec2(-1.0,0.0);
   }
 
-  vec3 filtered = base;
-  filtered = contrastSat(filtered, 0.08 + 0.16 * amt, 1.08 + 0.24 * amt);
-  filtered = paletteWash(filtered, mix(uC0, deepWarm, 0.60), mix(uC1, redWarm, 0.42), mix(hotWarm, magentaWarm, 0.38), 0.28 + 0.42 * amt);
-  filtered = splitTone(filtered, deepWarm, hotWarm, 0.18 + 0.24 * ch);
-  filtered = hueRotate(filtered, (uR1.z - 0.5) * 0.14 + (n0 - 0.5) * 0.06);
-  filtered = mix(filtered, bleedMix, (0.08 + 0.16 * amt) * (0.20 + 0.80 * leakMask) * (1.0 - 0.14 * guard));
+  // Drift affects only a few percent of the image, so random variations
+  // remain spatially stable and do not make angular beam shapes.
+  vec2 pn=rot2(p,(uR0.x-0.5)*0.70);
+  float n0=fbm6(pn*2.2+vec2(uSeed*0.013,13.0));
+  float n1=fbm4(rot2(p,1.15)*4.2+vec2(19.0,uSeed*0.017));
+  float n2=fbm4(p*3.2+vec2(uSeed*0.011,51.0));
+  vec2 wobble=vec2(n0-0.5,n2-0.5)*0.055;
+  float angle=(uR0.y-0.5)*0.24;
+  vec2 q=rot2(uv-anchor+wobble,angle);
+  vec2 axes=horizontalEdge
+    ? vec2(mix(0.38,0.62,uH0.y),mix(0.34,0.55,uH1.x))
+    : vec2(mix(0.34,0.55,uH1.x),mix(0.38,0.62,uH0.y));
+  float broad=softExposure(q,axes);
 
-  float rampT = clamp(leakMask * 0.72 + n1 * 0.20 + hotCore * 0.25, 0.0, 1.0);
-  vec3 leakColor = leakRamp(rampT, deepWarm, mix(redWarm, magentaWarm, 0.36), hotWarm);
+  vec2 anchor2=anchor+tangent*((uR1.x-0.5)*0.45)
+                       +inward*(0.15+0.11*uH1.y);
+  vec2 q2=rot2(uv-anchor2+wobble*0.50,-angle*0.65);
+  vec2 axes2=horizontalEdge?vec2(0.28,0.31):vec2(0.31,0.28);
+  float secondary=softExposure(q2,axes2);
+  float leakMask=1.0-(1.0-broad)*(1.0-secondary*0.34);
+  float brightCore=softExposure(q2,axes2*0.60);
+  // Low-frequency mottling without dividing the image into polygons.
+  leakMask*=0.89+0.11*n1;
+  leakMask=sat(leakMask);
 
-  vec3 outc = filtered;
-  outc = mix(outc, leakColor, leakMask * (0.34 + 0.50 * amt));
-  outc = screenBlend(outc, leakColor * haze * (0.14 + 0.28 * amt));
-  outc = screenBlend(outc, hotWarm * flare * (0.18 + 0.32 * amt));
-  outc = screenBlend(outc, paperHot * hotCore * (0.22 + 0.48 * amt));
+  vec2 px=vec2(1.0)/uResolution;
+  vec2 flow=tangent;
+  vec3 bleedA=texM(uv+flow*px*mix(2.0,8.0,amt)*leakMask);
+  vec3 bleedB=texM(uv-flow*px*mix(1.0,6.0,ch)*leakMask);
+  vec3 bleedMix=vec3(bleedA.r,base.g,bleedB.b);
 
-  vec3 revealMix = mix(filtered, base, 0.58);
-  // The old strong reveal strip could look like a diagonal fold/tear.
-  outc = mix(outc, revealMix, reveal * (0.045 + 0.095 * ch) * (0.65 + 0.35 * n1));
-  outc = mix(outc, vec3(1.0), hotCore * (0.10 + 0.34 * amt) * (1.0 - lum(base) * 0.42));
+  vec3 deepWarm=mix(vec3(0.60,0.035,0.08),uC0,0.16);
+  vec3 redWarm=mix(vec3(0.91,0.09,0.075),uC0,0.20);
+  vec3 magentaWarm=mix(vec3(0.87,0.20,0.34),uC2,0.24);
+  vec3 amberWarm=mix(vec3(1.0,0.66,0.36),uC1,0.17);
+  if(family < 1.0){
+    redWarm=mix(redWarm,vec3(0.97,0.12,0.08),0.24);
+  }else if(family < 2.0){
+    amberWarm=mix(amberWarm,vec3(1.0,0.69,0.29),0.25);
+  }else if(family < 3.0){
+    deepWarm=mix(deepWarm,vec3(0.73,0.03,0.14),0.24);
+  }else if(family < 4.0){
+    magentaWarm=mix(magentaWarm,vec3(0.93,0.24,0.34),0.25);
+  }else{
+    magentaWarm=mix(magentaWarm,vec3(0.86,0.13,0.28),0.30);
+  }
 
-  float veil = smoothstep(0.24, 0.88, n0 + n2 * 0.35) * leakMask * (0.10 + 0.22 * amt);
-  outc = screenBlend(outc, mix(redWarm, hotWarm, 0.65) * veil);
-  float hazeTint = smoothstep(0.18, 0.96, leakMask + (n2 - 0.5) * 0.18) * (0.08 + 0.16 * ch);
-  outc = mix(outc, mix(outc, magentaWarm, 0.36), hazeTint * (0.35 + 0.65 * (1.0 - guard)));
+  // Grade the photograph as before, but apply only one restrained light
+  // exposure instead of stacking several near-white screen layers.
+  vec3 filtered=contrastSat(base,0.05+0.10*amt,1.05+0.15*amt);
+  filtered=paletteWash(filtered,mix(uC0,deepWarm,0.62),
+                        mix(uC1,redWarm,0.40),
+                        mix(amberWarm,magentaWarm,0.36),0.20+0.30*amt);
+  filtered=splitTone(filtered,deepWarm,amberWarm,0.12+0.18*ch);
+  filtered=hueRotate(filtered,(uR1.z-0.5)*0.11+(n0-0.5)*0.04);
+  filtered=mix(filtered,bleedMix,(0.05+0.11*amt)*leakMask
+                                  *(1.0-0.16*guard));
 
-  float leakGrain = (hash21(floor(uv * uResolution) + uSeed * 37.0) - 0.5) * (0.005 + 0.009 * amt);
-  outc += vec3(leakGrain);
-  outc = preserveSource(base, outc);
-  vec3 leakTone = paletteWash(outc, deepWarm, mix(redWarm, magentaWarm, 0.4), hotWarm, 0.26 + 0.30 * amt);
-  leakTone = splitTone(leakTone, mix(deepWarm, magentaWarm, 0.35), paperHot, 0.16 + 0.22 * amt);
-  leakTone = hueRotate(leakTone, (uR0.z - 0.5) * 0.10 + hotCore * 0.05);
-  leakTone = contrastSat(leakTone, 0.04 + 0.12 * amt, 1.04 + 0.16 * amt);
-  outc = mix(outc, leakTone, 0.44 + 0.24 * amt);
-  outc = softShoulder(outc);
-  gl_FragColor = vec4(clamp(outc, 0.0, 1.0), 1.0);
+  float warmMix=sat(0.24+0.47*secondary+0.23*n2);
+  vec3 leakColor=mix(mix(deepWarm,redWarm,0.78),
+                     mix(magentaWarm,amberWarm,0.42+0.30*n1),warmMix);
+  vec3 outc=mix(filtered,leakColor,
+                 leakMask*(0.19+0.30*amt)*(1.0-0.10*guard));
+  outc=screenBlend(outc,redWarm*leakMask*(0.045+0.10*amt));
+  outc=screenBlend(outc,amberWarm*brightCore*(0.035+0.08*amt));
+  // Bright core is translucent and cannot turn broad areas into pure white.
+  float lift=brightCore*(0.025+0.075*amt)*(1.0-lum(base)*0.3);
+  outc=mix(outc,vec3(1.0,0.90,0.80),lift);
+  float veil=smoothstep(0.22,0.90,n0+n2*0.30)
+             *leakMask*(0.055+0.11*amt);
+  outc=screenBlend(outc,mix(redWarm,magentaWarm,0.32)*veil);
+
+  float leakGrain=(hash21(floor(uv*uResolution)+uSeed*37.0)-0.5)
+                  *(0.005+0.008*amt);
+  outc+=vec3(leakGrain);
+  outc=preserveSource(base,outc);
+  vec3 tone=paletteWash(outc,deepWarm,mix(redWarm,magentaWarm,0.40),
+                         amberWarm,0.20+0.23*amt);
+  tone=splitTone(tone,mix(deepWarm,magentaWarm,0.35),
+                 amberWarm,0.12+0.15*amt);
+  tone=hueRotate(tone,(uR0.z-0.5)*0.09);
+  tone=contrastSat(tone,0.035+0.08*amt,1.03+0.10*amt);
+  outc=mix(outc,tone,0.37+0.20*amt);
+  outc=softShoulder(outc);
+  gl_FragColor=vec4(clamp(outc,0.0,1.0),1.0);
 }`;
-
 
 const PALETTES = [
   {name:'EMBER FILM', c0:[0.95,0.58,0.32], c1:[1.00,0.85,0.55], c2:[0.98,0.48,0.66]},
@@ -646,6 +671,7 @@ async function saveHighRes(){
   if(!APP.source||APP.busy) return;
   setBusy(true,'RENDERING');
   let g;
+  let capture;
   try{
     const longSide=Number(ui.exportSize.value)||2600;
     const ratio=APP.source.width/APP.source.height;
@@ -661,8 +687,23 @@ async function saveHighRes(){
     g.clear();
     g.plane(outW,outH,1,1);
     g.resetShader();
-    await new Promise(r=>setTimeout(r,80));
-    const blob=await canvasToBlob(g.canvas,'image/png');
+
+    // Safari may discard a WebGL drawing buffer after returning to the event
+    // loop. The old 80 ms timeout before toBlob could therefore capture
+    // incomplete triangles/tiles, including a sharp center seam. Copy to a
+    // normal 2D canvas synchronously, BEFORE the first await.
+    if(g.drawingContext && typeof g.drawingContext.finish==='function'){
+      g.drawingContext.finish();
+    }
+    capture=document.createElement('canvas');
+    capture.width=outW;
+    capture.height=outH;
+    const captureCtx=capture.getContext('2d',{alpha:false});
+    if(!captureCtx) throw new Error('Cannot create the PNG capture canvas.');
+    captureCtx.drawImage(g.canvas,0,0,outW,outH);
+    g.remove();
+    g=null;
+    const blob=await canvasToBlob(capture,'image/png');
     const base=(APP.sourceName||'incident-archive').replace(/\.[^.]+$/,'').replace(/[^a-z0-9_-]+/gi,'_');
     const file=new File([blob],`${base}_${APP.mode.toLowerCase()}_${Date.now()}.png`,{type:'image/png'});
     if(navigator.canShare&&navigator.canShare({files:[file]})){
@@ -678,7 +719,11 @@ async function saveHighRes(){
       setTimeout(()=>URL.revokeObjectURL(objectURL),1200);
     }
   }catch(err){ showError(err); }
-  finally { if(g) g.remove(); setBusy(false); }
+  finally {
+    if(g) g.remove();
+    if(capture){ capture.width=0; capture.height=0; }
+    setBusy(false);
+  }
 }
 
 function canvasToBlob(canvas, type){
