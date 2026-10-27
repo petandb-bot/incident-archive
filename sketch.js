@@ -3,7 +3,7 @@
 window.IA_SCRIPT_LOADED = true;
 
 const APP = {
-  version: '0.2.9.3',
+  version: '0.2.9.4',
   mode: 'SOLAR',
   params: { amount: 88, chance: 80, preserve: 22 },
   recipe: null,
@@ -277,143 +277,102 @@ void main(){
 
 
 const LEAK_FRAG = COMMON + `
-// Filter-like color veils that bloom from an edge without turning into
-// hard rays or cut bands. The main impression should be dyed emulsion /
-// translucent gel rather than a piercing white flare.
-float gauss2(vec2 p, vec2 radii){
-  vec2 d = p / max(radii, vec2(0.01));
-  return exp(-1.45 * dot(d,d));
+// Film-dye flood. Strong, saturated color coverage, with a soft boundary
+// and one wide optical bleaching area. Intensity is independent of hue.
+// No rays, polygon clipping, straight hard seams, or small hot spots.
+float leakGaussian(vec2 d, vec2 spread){
+  vec2 q=d / max(spread,vec2(0.001));
+  return exp(-dot(q,q)*1.45);
 }
 void main(){
-  vec2 uv = screenUV();
-  vec2 p = uv - 0.5;
-  vec3 base = texM(uv);
-  float amt = uAmount, ch = uChance;
-  float guard = subjectGuard(uv, base);
+  vec2 uv=screenUV();
+  vec2 p=uv-0.5;
+  vec3 base=texM(uv);
+  float amt=uAmount;
+  float ch=uChance;
+  float family=floor(uR2.w*5.0);
 
-  float family = floor(uR2.w*5.0);
-  vec2 anchor;
-  vec2 tangent;
-  vec2 inward;
-  bool horizontalEdge = (family < 2.0);
-  if(family < 1.0){
-    anchor=vec2(mix(0.18,0.82,uH0.x),-0.12);
-    tangent=vec2(1.0,0.0); inward=vec2(0.0,1.0);
-  }else if(family < 2.0){
-    anchor=vec2(mix(0.18,0.82,uH0.x),1.12);
-    tangent=vec2(1.0,0.0); inward=vec2(0.0,-1.0);
-  }else if(family < 3.0){
-    anchor=vec2(-0.12,mix(0.18,0.82,uH0.x));
-    tangent=vec2(0.0,1.0); inward=vec2(1.0,0.0);
-  }else if(family < 4.0){
-    anchor=vec2(1.12,mix(0.18,0.82,uH0.x));
-    tangent=vec2(0.0,1.0); inward=vec2(-1.0,0.0);
+  // Use the same spatial concept regardless of the chosen dye color.
+  // depth measures distance from the selected image edge.
+  float depth;
+  float across;
+  if(family<1.0){
+    depth=uv.y; across=uv.x;
+  }else if(family<2.0){
+    depth=1.0-uv.y; across=uv.x;
+  }else if(family<3.0){
+    depth=uv.x; across=uv.y;
+  }else if(family<4.0){
+    depth=1.0-uv.x; across=uv.y;
   }else{
-    anchor=vec2(mix(0.16,0.84,uH0.x),-0.10);
-    tangent=vec2(1.0,0.0); inward=vec2(0.0,1.0);
+    depth=uv.y; across=uv.x;
   }
 
-  float n0 = fbm6(rot2(p,(uR0.x-0.5)*0.7)*1.8 + vec2(uSeed*0.013, 11.0));
-  float n1 = fbm4(rot2(p,(uR0.y-0.5)*1.2)*3.4 + vec2(31.0, uSeed*0.019));
-  float n2 = fbm4(p*2.6 + vec2(uSeed*0.021, 71.0));
-  float n3 = fbm6(rot2(p,1.1)*1.9 + vec2(57.0, uSeed*0.015));
+  float n0=fbm4(p*2.0+vec2(uSeed*0.013,17.0));
+  float n1=fbm4(rot2(p,0.9)*3.5+vec2(39.0,uSeed*0.017));
+  float n2=fbm4(rot2(p,-0.6)*1.7+vec2(uSeed*0.021,83.0));
 
-  vec2 rel = uv - anchor;
-  float depth = dot(rel, inward);
-  float along = dot(rel, tangent);
-  float boundaryWarp = (n0 - 0.5) * (0.08 + 0.08*ch) + (n2 - 0.5) * 0.05;
-  float boundary = mix(0.18, 0.55, uH0.y) + boundaryWarp;
-  float softness = mix(0.16, 0.36, uH1.x) + 0.08*amt;
+  // Large color field: covers roughly 50-80% of the photograph on average.
+  // Low-frequency perturbation changes shape without any sharp transitions.
+  float boundary=0.53+0.23*uH0.y;
+  boundary+=(n0-0.5)*(0.12+0.06*ch)+(n2-0.5)*0.07;
+  float feather=0.068+0.085*uH1.x;
+  float flood=1.0-smoothstep(boundary-feather,boundary+feather,depth);
 
-  // Main dyed slab entering from one side. The boundary is soft and gently
-  // warped so it reads as a filter stain rather than a hard geometric split.
-  float slab = 1.0 - smoothstep(boundary - softness, boundary + softness, depth);
-  slab *= 0.86 + 0.14 * smoothstep(-0.35, 0.85, along + (n1-0.5)*0.22);
-  slab *= 0.93 + 0.07*n3;
-
-  vec2 c1 = anchor + inward*(boundary*0.60) + tangent*((uR1.x-0.5)*0.52);
-  vec2 c2 = anchor + inward*(boundary*0.98) + tangent*((uR1.y-0.5)*0.72);
-  vec2 c3 = anchor + inward*(boundary*0.40) + tangent*((uR2.x-0.5)*0.38);
-
-  vec2 r1 = horizontalEdge ? vec2(mix(0.55,1.15,uH1.y), mix(0.18,0.38,uH2.x))
-                           : vec2(mix(0.18,0.38,uH2.x), mix(0.55,1.15,uH1.y));
-  vec2 r2 = horizontalEdge ? vec2(mix(0.25,0.75,uH2.y), mix(0.12,0.28,uR0.z))
-                           : vec2(mix(0.12,0.28,uR0.z), mix(0.25,0.75,uH2.y));
-  vec2 r3 = horizontalEdge ? vec2(mix(0.14,0.35,uR1.z), mix(0.07,0.16,uR1.w))
-                           : vec2(mix(0.07,0.16,uR1.w), mix(0.14,0.35,uR1.z));
-
-  float veilA = gauss2(uv - c1 + vec2((n1-0.5)*0.05,(n2-0.5)*0.05), r1);
-  float veilB = gauss2(uv - c2 + vec2((n0-0.5)*0.03,(n3-0.5)*0.03), r2);
-  float veilC = gauss2(uv - c3, r3);
-
-  float mask = max(slab, veilA*0.92);
-  mask = max(mask, veilB*0.78);
-  mask = max(mask, veilC*0.46);
-  mask *= 0.90 + 0.10*n1;
-  mask = sat(mask);
-
-  // A reveal zone lets the underlying photo show through more clearly inside
-  // the leak, similar to translucent colored film rather than opaque paint.
-  float reveal = veilB * (0.35 + 0.45*amt) + veilC * 0.22;
-  reveal *= 1.0 - 0.18*guard;
-  reveal = sat(reveal);
-
-  // Palette-led coloration: mutate must change the filter color family.
-  vec3 filterDark = mix(uC0, uC2, 0.25 + 0.45*n0);
-  vec3 filterMid  = mix(uC1, uC0, 0.30 + 0.40*n1);
-  vec3 filterLight= mix(uC2, uC1, 0.55 + 0.25*n2);
-  if(family < 1.0){
-    filterMid = mix(filterMid, uC1, 0.20);
-  }else if(family < 2.0){
-    filterDark = mix(filterDark, uC0, 0.18);
-  }else if(family < 3.0){
-    filterLight = mix(filterLight, uC2, 0.22);
-  }else if(family < 4.0){
-    filterMid = mix(filterMid, mix(uC0,uC2,0.5), 0.20);
-  }else{
-    filterDark = mix(filterDark, filterLight, 0.24);
+  if(family>=4.0){
+    // A second faint tide of dye, smoothly joined, not an intersecting cut.
+    float secondary=1.0-smoothstep(0.12,0.35,1.0-uv.y+(n1-0.5)*0.06);
+    flood=1.0-(1.0-flood)*(1.0-secondary*0.48);
   }
 
-  vec3 baseGrade = contrastSat(base, 0.03 + 0.06*amt, 1.02 + 0.08*amt);
-  baseGrade = paletteWash(baseGrade, filterDark, filterMid, filterLight,
-                          0.08 + 0.14*amt);
-  baseGrade = splitTone(baseGrade, filterDark, filterLight, 0.06 + 0.10*ch);
+  // Broad emulsion bloom close to the boundary. Avoid pinpoint light cores.
+  float x0=0.22+0.56*uH1.y;
+  float bloomX=(across-x0)+(n1-0.5)*0.045;
+  float bloomY=depth-(boundary+0.025);
+  float bloom=leakGaussian(vec2(bloomX,bloomY),
+                           vec2(0.31+0.20*uH2.x,0.14+0.13*uH2.y));
+  float haze=leakGaussian(vec2(bloomX,bloomY),vec2(0.62,0.33));
+  float wash=sat(flood+haze*(0.10+0.13*amt));
 
-  float gradient = sat(0.18 + 0.55*slab + 0.24*veilA + 0.18*n2);
-  vec3 filterColor = mix(filterDark, filterMid, gradient);
-  filterColor = mix(filterColor, filterLight, 0.22 + 0.55*veilB);
-  filterColor = hueRotate(filterColor, (uR2.z - 0.5) * 0.22);
+  // uC0 is deep dye, uC1 the saturated body, uC2 the luminous emulsion.
+  // These come from LEAK_PALETTES rather than the pastel palettes elsewhere.
+  vec3 deepDye=uC0;
+  vec3 mainDye=uC1;
+  vec3 lightDye=uC2;
+  vec3 dye=mix(deepDye,mainDye,0.52+0.24*n0+0.10*n1);
+  dye=mix(dye,lightDye,0.09+0.15*n2);
+  dye=clamp(dye*(0.94+0.12*n1),0.0,1.0);
 
-  // Build the leak mainly as a tinted veil with moderate screen lift.
-  vec3 outc = mix(baseGrade, baseGrade * mix(vec3(1.0), filterColor, 0.80),
-                  mask * (0.28 + 0.34*amt) * (1.0 - 0.08*guard));
-  outc = mix(outc, filterColor, mask * (0.10 + 0.28*amt) * (1.0 - 0.10*guard));
-  outc = screenBlend(outc, filterColor * mask * (0.04 + 0.12*amt));
+  // Global color contamination is visible even beyond the flood.
+  // Inside the flood, a nearly opaque mass of pigment replaces the photo.
+  vec3 contaminated=base*mix(vec3(1.0),mainDye,0.43*amt);
+  contaminated=mix(contaminated,mainDye,0.09+0.14*amt);
+  float coverage=wash*(0.84+0.15*amt);
+  vec3 outc=mix(contaminated,dye,coverage);
 
-  // Translucent reveal: the photo becomes more visible within some areas of
-  // the colored slab instead of being buried by white glare.
-  vec3 revealed = paletteWash(base, filterMid, filterLight, filterDark,
-                              0.10 + 0.12*amt);
-  revealed = contrastSat(revealed, 0.00 + 0.04*amt, 1.00 + 0.06*amt);
-  outc = mix(outc, revealed, reveal * (0.22 + 0.34*ch));
+  // Underlying photograph survives at the boundary and optical opening.
+  // It appears through dyed exposure rather than a geometric cut-out.
+  float reveal=bloom*(0.12+0.19*ch)*(1.0-0.20*flood);
+  vec3 exposedPhoto=mix(base,base*lightDye,0.28);
+  outc=mix(outc,exposedPhoto,reveal);
 
-  // Only a soft highlight remains; no aggressive white beam.
-  float glow = veilC * (0.015 + 0.055*amt) * (1.0 - lum(base)*0.25);
-  outc = mix(outc, screenBlend(outc, filterLight * 0.70 + vec3(0.18)), glow);
+  // One broad overexposed area as in the original saturated red reference.
+  // The highlight remains smooth and tied to the pigment's own light tone.
+  vec3 paper=mix(lightDye,vec3(1.0),0.52);
+  float bleach=bloom*(0.41+0.32*amt);
+  bleach*=0.86+0.14*n2;
+  outc=mix(outc,paper,bleach);
+  outc=screenBlend(outc,lightDye*haze*(0.035+0.08*amt));
 
-  float grain = (hash21(floor(uv*uResolution)+uSeed*37.0)-0.5) * (0.004 + 0.007*amt);
-  outc += vec3(grain);
-
-  outc = preserveSource(base, outc);
-  vec3 tone = paletteWash(outc, filterDark, filterMid, filterLight,
-                          0.10 + 0.16*amt);
-  tone = splitTone(tone, mix(filterDark,filterMid,0.35), filterLight,
-                   0.06 + 0.10*amt);
-  tone = contrastSat(tone, 0.025 + 0.05*amt, 1.02 + 0.08*amt);
-  outc = mix(outc, tone, 0.24 + 0.18*amt);
-  outc = softShoulder(outc);
-  gl_FragColor = vec4(clamp(outc,0.0,1.0), 1.0);
+  // Keep the source's detail in the uncovered region, and grain everywhere.
+  float grain=(hash21(floor(uv*uResolution)+uSeed*37.0)-0.5)
+               *(0.005+0.008*amt);
+  outc+=vec3(grain);
+  outc=preserveSource(base,outc);
+  outc=softShoulder(outc);
+  gl_FragColor=vec4(clamp(outc,0.0,1.0),1.0);
 }`;
+
 const PALETTES = [
   {name:'EMBER FILM', c0:[0.95,0.58,0.32], c1:[1.00,0.85,0.55], c2:[0.98,0.48,0.66]},
   {name:'MINT BATH', c0:[0.55,0.84,0.67], c1:[0.74,0.92,0.88], c2:[0.90,0.98,0.96]},
@@ -423,11 +382,24 @@ const PALETTES = [
   {name:'PALE SILVER', c0:[0.72,0.76,0.80], c1:[0.90,0.92,0.95], c2:[0.99,0.97,0.94]}
 ];
 
+// LEAK exclusively uses full-strength photographic dye colors. The shared
+// PALETTES used by SOLAR, CHEMICAL and REGISTER remain untouched.
+const LEAK_PALETTES = [
+  {name:'SCARLET FLOOD', c0:[0.42,0.010,0.016], c1:[0.98,0.025,0.018], c2:[1.00,0.68,0.44]},
+  {name:'COBALT FLOOD', c0:[0.012,0.030,0.32], c1:[0.035,0.20,1.00], c2:[0.57,0.75,1.00]},
+  {name:'VIRIDIAN FLOOD', c0:[0.005,0.20,0.095], c1:[0.015,0.79,0.32], c2:[0.62,1.00,0.64]},
+  {name:'VIOLET FLOOD', c0:[0.24,0.012,0.34], c1:[0.70,0.035,0.97], c2:[0.95,0.61,1.00]},
+  {name:'CYAN FLOOD', c0:[0.006,0.24,0.28], c1:[0.00,0.82,0.96], c2:[0.58,0.97,1.00]},
+  {name:'AMBER FLOOD', c0:[0.46,0.13,0.006], c1:[1.00,0.49,0.012], c2:[1.00,0.88,0.48]},
+  {name:'MAGENTA FLOOD', c0:[0.36,0.004,0.17], c1:[1.00,0.04,0.48], c2:[1.00,0.63,0.77]},
+  {name:'ACID FLOOD', c0:[0.28,0.32,0.008], c1:[0.84,0.96,0.015], c2:[0.99,1.00,0.57]}
+];
+
 const FAMILIES = {
   SOLAR:['SABATTIER','METALLIC','FLASHLINE','PARTIAL NEGATIVE','OVEREXPOSE'],
   CHEMICAL:['BLEACH BATH','DYE FAILURE','DEVELOPER SURGE','CROSS BATH','SILVER RESIDUE'],
   REGISTER:['OFFSET','SLIT','DOUBLE', 'MISALIGN', 'PLATE SHIFT'],
-  LEAK:['RED FLOOD','LIGHT LEAK','HEAT GATE','EMULSION BLEED','WHITE BURST']
+  LEAK:['UPPER FLOOD','LOWER FLOOD','LEFT FLOOD','RIGHT FLOOD','DOUBLE FLOOD']
 };
 
 let ui = {};
@@ -614,7 +586,14 @@ function toggleEdit(){
 
 function makeRecipe(mode){
   const rnd=()=>Math.random();
-  const p=PALETTES[Math.floor(rnd()*PALETTES.length)];
+  const palettes = mode==='LEAK' ? LEAK_PALETTES : PALETTES;
+  let paletteIndex = Math.floor(rnd()*palettes.length);
+  // For LEAK, each MUTATE selects a genuinely different color family.
+  if(mode==='LEAK' && APP.mode==='LEAK' && APP.recipe &&
+     palettes[paletteIndex].name===APP.recipe.palette){
+    paletteIndex=(paletteIndex+1+Math.floor(rnd()*(palettes.length-1)))%palettes.length;
+  }
+  const p=palettes[paletteIndex];
   const familyIndex=Math.floor(rnd()*FAMILIES[mode].length);
   const fam=FAMILIES[mode][familyIndex];
   const recipe={
