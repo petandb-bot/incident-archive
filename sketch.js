@@ -3,7 +3,7 @@
 window.IA_SCRIPT_LOADED = true;
 
 const APP = {
-  version: '0.2.9',
+  version: '0.2.9.1',
   mode: 'SOLAR',
   params: { amount: 88, chance: 80, preserve: 22 },
   recipe: null,
@@ -252,7 +252,11 @@ void main(){
 
 const LEAK_FRAG = COMMON + `
 float bandSoft(float x, float c, float w, float blur){
-  return 1.0 - smoothstep(w, w + blur, abs(x - c));
+  // Wider C2-continuous shoulder: keep a bright core but eliminate the sharp seam.
+  float inner = w * 0.58;
+  float outer = w + blur * 1.52;
+  float t = clamp((abs(x - c) - inner) / max(outer - inner, 0.001), 0.0, 1.0);
+  return 1.0 - t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
 }
 vec3 leakRamp(float t, vec3 a, vec3 b, vec3 c){
   vec3 ab = mix(a, b, smoothstep(0.0, 0.65, t));
@@ -275,15 +279,18 @@ void main(){
   float axis = (family < 2.0) ? q.y : q.x;
   float crossAxis = (family < 2.0) ? q.x : q.y;
 
-  float center = mix(-0.16, 0.16, uH0.x) + (n0 - 0.5) * 0.12;
+  // Small low-frequency deviations remove geometrically straight, folded-paper edges.
+  float center = mix(-0.16, 0.16, uH0.x) + (n0 - 0.5) * 0.19 + (n2 - 0.5) * 0.045;
   float width = mix(0.22, 0.48, uH0.y) * (0.72 + 0.52 * amt);
+  width *= mix(0.92, 1.08, n1);
   float blur = mix(0.08, 0.22, uH1.x);
   float band = bandSoft(axis, center, width, blur);
 
+  // The internal exposure strip should read as a glow, not a cut line.
   float revealCenter = center + mix(-0.08, 0.08, uH2.x);
-  float reveal = bandSoft(axis, revealCenter, width * 0.16, blur * 0.65);
-  float hotCore = bandSoft(axis, center + mix(-0.03, 0.03, uH1.y), width * 0.08, blur * 0.55);
-  float haze = bandSoft(axis, center, width * 1.25, blur * 1.35);
+  float reveal = bandSoft(axis, revealCenter, width * 0.26, blur * 0.94);
+  float hotCore = bandSoft(axis, center + mix(-0.03, 0.03, uH1.y), width * 0.19, blur * 0.96);
+  float haze = bandSoft(axis, center, width * 1.26, blur * 1.36);
 
   float edgeTop = 1.0 - smoothstep(-0.52, 0.18, q.y);
   float edgeBottom = smoothstep(-0.18, 0.52, q.y);
@@ -296,8 +303,10 @@ void main(){
 
   float spread = exp(-pow((crossAxis - mix(-0.24, 0.24, uR1.x)) / max(0.16, mix(0.22, 0.48, uR1.y)), 2.0));
   float flare = edgeAnchor * spread;
-  float leakMask = max(band * (0.42 + 0.58 * edgeAnchor), haze * flare * (0.36 + 0.34 * ch));
-  leakMask = clamp(leakMask, 0.0, 1.0);
+  // Smooth union avoids the ridge created where two exposure masks crossed.
+  float primary = clamp(band * (0.42 + 0.58 * edgeAnchor), 0.0, 1.0);
+  float spill = clamp(haze * flare * (0.36 + 0.34 * ch), 0.0, 1.0);
+  float leakMask = 1.0 - (1.0 - primary) * (1.0 - spill);
 
   vec2 px = vec2(1.0) / uResolution;
   vec2 flow = vec2(cos(angle + 1.5707963), sin(angle + 1.5707963));
@@ -338,10 +347,11 @@ void main(){
   outc = mix(outc, leakColor, leakMask * (0.34 + 0.50 * amt));
   outc = screenBlend(outc, leakColor * haze * (0.14 + 0.28 * amt));
   outc = screenBlend(outc, hotWarm * flare * (0.18 + 0.32 * amt));
-  outc = screenBlend(outc, paperHot * hotCore * (0.24 + 0.54 * amt));
+  outc = screenBlend(outc, paperHot * hotCore * (0.22 + 0.48 * amt));
 
   vec3 revealMix = mix(filtered, base, 0.58);
-  outc = mix(outc, revealMix, reveal * (0.16 + 0.34 * ch));
+  // The old strong reveal strip could look like a diagonal fold/tear.
+  outc = mix(outc, revealMix, reveal * (0.045 + 0.095 * ch) * (0.65 + 0.35 * n1));
   outc = mix(outc, vec3(1.0), hotCore * (0.10 + 0.34 * amt) * (1.0 - lum(base) * 0.42));
 
   float veil = smoothstep(0.24, 0.88, n0 + n2 * 0.35) * leakMask * (0.10 + 0.22 * amt);
