@@ -3,9 +3,9 @@
 window.IA_SCRIPT_LOADED = true;
 
 const APP = {
-  version: '0.2.6',
+  version: '0.2.7',
   mode: 'SOLAR',
-  params: { amount: 82, chance: 76, preserve: 34 },
+  params: { amount: 88, chance: 80, preserve: 22 },
   recipe: null,
   history: [],
   source: null,
@@ -59,6 +59,37 @@ float ridge(float x){return 1.0-abs(2.0*x-1.0);}
 vec2 rot2(vec2 p,float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c)*p;} 
 vec3 screenBlend(vec3 a, vec3 b){return 1.0-(1.0-a)*(1.0-b);} 
 vec3 softLight(vec3 a, vec3 b){return mix(sqrt(max(a,0.0))*(2.0*b-1.0)+2.0*a*(1.0-b),2.0*a*b+a*a*(1.0-2.0*b),step(b,vec3(0.5)));}
+
+vec3 satAdjust(vec3 c, float s){float y=lum(c);return mix(vec3(y), c, s);} 
+vec3 hueRotate(vec3 c, float a){
+  float s=sin(a), co=cos(a);
+  mat3 m = mat3(
+    0.213+0.787*co-0.213*s, 0.715-0.715*co-0.715*s, 0.072-0.072*co+0.928*s,
+    0.213-0.213*co+0.143*s, 0.715+0.285*co+0.140*s, 0.072-0.072*co-0.283*s,
+    0.213-0.213*co-0.787*s, 0.715-0.715*co+0.715*s, 0.072+0.928*co+0.072*s
+  );
+  return clamp(m*c,0.0,1.5);
+}
+vec3 splitTone(vec3 c, vec3 shad, vec3 high, float strength){
+  float y=lum(c);
+  float shadowMask = 1.0-smoothstep(0.16,0.66,y);
+  float highMask = smoothstep(0.42,1.0,y);
+  vec3 outc = c;
+  outc = mix(outc, outc * mix(vec3(1.0), shad, 0.68), strength * shadowMask);
+  outc = screenBlend(outc, high * highMask * strength * 0.28);
+  return outc;
+}
+vec3 paletteWash(vec3 c, vec3 a, vec3 b, vec3 d, float strength){
+  float y=lum(c);
+  vec3 tint = mix(a, b, smoothstep(0.12,0.72,y));
+  tint = mix(tint, d, smoothstep(0.72,1.0,y));
+  vec3 washed = c * mix(vec3(1.0), tint, 0.42*strength) + tint * (0.04 + 0.06*strength);
+  return mix(c, washed, strength);
+}
+vec3 contrastSat(vec3 c, float contrast, float satBoost){
+  c = clamp((c-0.5)*(1.0+contrast)+0.5,0.0,1.2);
+  return satAdjust(c, satBoost);
+}
 vec3 preserveSource(vec3 base, vec3 processed){float k=sat(uPreserve);k=k*k*(3.0-2.0*k);float yp=max(lum(processed),0.002), yb=max(lum(base),0.016);vec3 src=clamp(base*(yp/yb),0.0,1.3);vec3 pc=processed-vec3(yp);vec3 sc=src-vec3(lum(src));return clamp(vec3(yp)+mix(pc,sc,k),0.0,1.35);} 
 vec3 softShoulder(vec3 c){return c/(vec3(1.0)+max(c-vec3(0.72),vec3(0.0))*0.96);} 
 float edge(vec2 uv,float px){vec2 dx=vec2(px,0.0), dy=vec2(0.0,px);float ex=abs(lum(texM(uv+dx))-lum(texM(uv-dx)));float ey=abs(lum(texM(uv+dy))-lum(texM(uv-dy)));return sat((ex+ey)*2.2);} 
@@ -115,6 +146,11 @@ void main(){
   float grain=(hash21(floor(uv*uResolution)+uSeed*19.0)-0.5)*(0.008+0.008*amt);
   sabattier+=vec3(grain);
   sabattier=preserveSource(base,sabattier);
+  vec3 solarTone = splitTone(sabattier, mix(uC0,uC2,0.52), mix(uC1,vec3(1.0,0.985,0.96),0.50), 0.22+0.26*amt);
+  solarTone = paletteWash(solarTone, uC0, mix(uC1,vec3(1.0),0.30), uC2, 0.22+0.24*ch);
+  solarTone = hueRotate(solarTone, (uR2.y-0.5)*0.22 + (n0-0.5)*0.08);
+  solarTone = contrastSat(solarTone, 0.06+0.10*amt, 1.10+0.10*amt);
+  sabattier = mix(sabattier, solarTone, 0.36+0.20*amt);
   sabattier=softShoulder(sabattier);
   gl_FragColor=vec4(clamp(sabattier,0.0,1.0),1.0);
 }`;
@@ -142,21 +178,26 @@ void main(){
 
   vec3 cross = vec3(layer.g*0.82+layer.r*0.20, layer.b*0.74+layer.g*0.26, layer.r*0.78+layer.b*0.18);
   vec3 spectral = mix(triPalette(chem0*0.78+uR1.x), mix(uC0,uC2,0.52), 0.26);
-  vec3 chem = mix(base, cross, bath*(0.28+0.40*amt)*(1.0-0.22*guard));
-  chem = mix(chem, spectral * vec3(0.86+lum(layer)*0.28), dyeFail*(0.10+0.26*ch));
-  chem = mix(chem, vec3(1.0), bleach*(0.05+0.22*amt)*(1.0-lum(base)*0.45));
+  vec3 chem = mix(base, cross, bath*(0.34+0.48*amt)*(1.0-0.18*guard));
+  chem = mix(chem, spectral * vec3(0.90+lum(layer)*0.34), dyeFail*(0.16+0.32*ch));
+  chem = mix(chem, vec3(1.0), bleach*(0.08+0.26*amt)*(1.0-lum(base)*0.38));
 
   float edgeField=edge(uv,1.4/uResolution.x);
-  chem = screenBlend(chem, mix(vec3(1.0,0.98,0.95), uC1, 0.30) * (edgeField*bath) * (0.06+0.18*amt));
+  chem = screenBlend(chem, mix(vec3(1.0,0.98,0.95), uC1, 0.36) * (edgeField*bath) * (0.08+0.22*amt));
 
-  vec3 lowShift = mix(vec3(lum(chem)), chem.bgr, 0.28+0.18*uR1.y);
-  chem = mix(chem, lowShift, smoothstep(0.0,0.40,1.0-lum(base))*(0.08+0.18*ch));
-  chem = mix(chem, hsvShiftLike(chem, chem1*0.22 + uR1.z*0.30), 0.10+0.16*amt);
+  vec3 lowShift = mix(vec3(lum(chem)), chem.bgr, 0.34+0.22*uR1.y);
+  chem = mix(chem, lowShift, smoothstep(0.0,0.40,1.0-lum(base))*(0.12+0.22*ch));
+  chem = mix(chem, hsvShiftLike(chem, chem1*0.26 + uR1.z*0.34), 0.14+0.22*amt);
 
-  float sediment = pow(hash21(floor(uv*uResolution*0.12)+uSeed*11.0), 15.0) * bath * 0.08 * amt;
+  float sediment = pow(hash21(floor(uv*uResolution*0.12)+uSeed*11.0), 15.0) * bath * 0.10 * amt;
   chem = mix(chem, vec3(0.96,0.93,0.86), sediment);
   chem += vec3((hash21(floor(uv*uResolution)+uSeed*31.0)-0.5) * (0.007+0.008*amt));
   chem = preserveSource(base, chem);
+  vec3 chemTone = paletteWash(chem, mix(uC0,vec3(0.92,0.82,0.74),0.32), mix(uC1,uC2,0.46), vec3(1.0,0.99,0.96), 0.34+0.30*amt);
+  chemTone = splitTone(chemTone, mix(uC0,uC2,0.48), mix(uC1,vec3(1.0),0.40), 0.18+0.22*ch);
+  chemTone = hueRotate(chemTone, (uR0.x-0.5)*0.28 + (chem1-0.5)*0.12);
+  chemTone = contrastSat(chemTone, 0.08+0.12*amt, 1.12+0.18*amt);
+  chem = mix(chem, chemTone, 0.48+0.26*amt);
   chem = softShoulder(chem);
   gl_FragColor = vec4(clamp(chem,0.0,1.0),1.0);
 }`;
@@ -194,11 +235,16 @@ void main(){
   float slit = pow(ridge(0.5+0.5*sin(dot(rot2(p,a0),vec2(1.0,0.18))*mix(24.0,90.0,uR1.y)+z1*5.0)), 13.0);
   incident = mix(incident, texM(uv+dir0*px*d0*0.75).bgr, slit*zone*(0.08+0.24*amt));
 
-  vec3 outc = mix(base, incident, zone*(0.48+0.30*amt));
-  outc = screenBlend(outc, triPalette(uR1.z+z0*0.3) * e * zone * (0.06+0.18*amt));
-  outc = mix(outc, vec3(1.0), e*zone*(0.05+0.12*amt));
+  vec3 outc = mix(base, incident, zone*(0.56+0.34*amt));
+  outc = screenBlend(outc, triPalette(uR1.z+z0*0.3) * e * zone * (0.08+0.22*amt));
+  outc = mix(outc, vec3(1.0), e*zone*(0.06+0.14*amt));
   outc += vec3((hash21(floor(uv*uResolution)+uSeed*23.0)-0.5) * (0.007+0.009*amt));
   outc = preserveSource(base, outc);
+  vec3 regTone = splitTone(outc, mix(uC2,uC0,0.56), mix(uC1,vec3(1.0),0.34), 0.16+0.18*amt);
+  regTone = paletteWash(regTone, mix(uC0,uC2,0.40), uC1, vec3(1.0), 0.18+0.16*ch);
+  regTone = hueRotate(regTone, (z0-z1)*0.10 + (uR1.z-0.5)*0.18);
+  regTone = contrastSat(regTone, 0.05+0.10*amt, 1.06+0.12*amt);
+  outc = mix(outc, regTone, 0.34+0.18*amt);
   outc = softShoulder(outc);
   gl_FragColor = vec4(clamp(outc,0.0,1.0),1.0);
 }`;
@@ -271,9 +317,14 @@ void main(){
 
   float silverDust = pow(hash21(floor(uv*uResolution*0.13)+uSeed*17.0),17.0)*contact*(0.024+0.050*amt);
   outc=mix(outc,paper,silverDust);
-  outc=mix(outc,hsvShiftLike(outc,0.05+uR1.z*0.12),0.04+0.10*ch);
+  outc=mix(outc,hsvShiftLike(outc,0.05+uR1.z*0.12),0.08+0.16*ch);
   outc+=vec3((hash21(floor(uv*uResolution)+uSeed*47.0)-0.5)*(0.005+0.007*amt));
   outc=preserveSource(base,outc);
+  vec3 latentTone = paletteWash(outc, mix(paper,vec3(0.92,0.94,1.0),0.24), lavender, vec3(1.0,0.995,0.985), 0.28+0.24*amt);
+  latentTone = splitTone(latentTone, mix(silver,paper,0.46), mix(lavender,vec3(1.0),0.18), 0.22+0.20*amt);
+  latentTone = hueRotate(latentTone, (uR2.z-0.5)*0.14);
+  latentTone = contrastSat(latentTone, 0.04+0.08*amt, 0.92+0.10*amt);
+  outc = mix(outc, latentTone, 0.46+0.22*amt);
   outc=softShoulder(outc);
   gl_FragColor=vec4(clamp(outc,0.0,1.0),1.0);
 }`;
