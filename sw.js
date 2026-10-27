@@ -1,5 +1,5 @@
-const CACHE='incident-archive-v0292';
-const CORE=['./','./index.html','./style.css?v=0292','./sketch.js?v=0292','./manifest.webmanifest?v=0292','./icons/icon-180.png','./icons/icon-192.png','./icons/icon-512.png'];
+const CACHE='incident-archive-v0293';
+const CORE=['./','./index.html','./style.css?v=0293','./sketch.js?v=0293','./manifest.webmanifest?v=0293','./icons/icon-180.png','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting()));
 });

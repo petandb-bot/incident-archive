@@ -3,7 +3,7 @@
 window.IA_SCRIPT_LOADED = true;
 
 const APP = {
-  version: '0.2.9.2',
+  version: '0.2.9.3',
   mode: 'SOLAR',
   params: { amount: 88, chance: 80, preserve: 22 },
   recipe: null,
@@ -277,126 +277,143 @@ void main(){
 
 
 const LEAK_FRAG = COMMON + `
-// An optically broad, elliptical exposure field. No bands, slits, reveal
-// strips or intersecting rays: those produced paper-fold / cut-line shapes.
-float softExposure(vec2 p,vec2 radii){
-  vec2 d=p/max(radii,vec2(0.01));
-  float r=length(d);
-  return exp(-1.55*r*r);
+// Filter-like color veils that bloom from an edge without turning into
+// hard rays or cut bands. The main impression should be dyed emulsion /
+// translucent gel rather than a piercing white flare.
+float gauss2(vec2 p, vec2 radii){
+  vec2 d = p / max(radii, vec2(0.01));
+  return exp(-1.45 * dot(d,d));
 }
 void main(){
   vec2 uv = screenUV();
   vec2 p = uv - 0.5;
   vec3 base = texM(uv);
   float amt = uAmount, ch = uChance;
-  float guard = subjectGuard(uv,base);
+  float guard = subjectGuard(uv, base);
 
   float family = floor(uR2.w*5.0);
-  bool horizontalEdge = (family < 2.0);
   vec2 anchor;
   vec2 tangent;
   vec2 inward;
+  bool horizontalEdge = (family < 2.0);
   if(family < 1.0){
-    anchor=vec2(mix(0.20,0.80,uH0.x),-0.10);
+    anchor=vec2(mix(0.18,0.82,uH0.x),-0.12);
     tangent=vec2(1.0,0.0); inward=vec2(0.0,1.0);
   }else if(family < 2.0){
-    anchor=vec2(mix(0.20,0.80,uH0.x),1.10);
+    anchor=vec2(mix(0.18,0.82,uH0.x),1.12);
     tangent=vec2(1.0,0.0); inward=vec2(0.0,-1.0);
   }else if(family < 3.0){
-    anchor=vec2(-0.10,mix(0.20,0.80,uH0.x));
+    anchor=vec2(-0.12,mix(0.18,0.82,uH0.x));
     tangent=vec2(0.0,1.0); inward=vec2(1.0,0.0);
-  }else{
-    anchor=vec2(1.10,mix(0.20,0.80,uH0.x));
-    tangent=vec2(0.0,1.0); inward=vec2(-1.0,0.0);
-  }
-
-  // Drift affects only a few percent of the image, so random variations
-  // remain spatially stable and do not make angular beam shapes.
-  vec2 pn=rot2(p,(uR0.x-0.5)*0.70);
-  float n0=fbm6(pn*2.2+vec2(uSeed*0.013,13.0));
-  float n1=fbm4(rot2(p,1.15)*4.2+vec2(19.0,uSeed*0.017));
-  float n2=fbm4(p*3.2+vec2(uSeed*0.011,51.0));
-  vec2 wobble=vec2(n0-0.5,n2-0.5)*0.055;
-  float angle=(uR0.y-0.5)*0.24;
-  vec2 q=rot2(uv-anchor+wobble,angle);
-  vec2 axes=horizontalEdge
-    ? vec2(mix(0.38,0.62,uH0.y),mix(0.34,0.55,uH1.x))
-    : vec2(mix(0.34,0.55,uH1.x),mix(0.38,0.62,uH0.y));
-  float broad=softExposure(q,axes);
-
-  vec2 anchor2=anchor+tangent*((uR1.x-0.5)*0.45)
-                       +inward*(0.15+0.11*uH1.y);
-  vec2 q2=rot2(uv-anchor2+wobble*0.50,-angle*0.65);
-  vec2 axes2=horizontalEdge?vec2(0.28,0.31):vec2(0.31,0.28);
-  float secondary=softExposure(q2,axes2);
-  float leakMask=1.0-(1.0-broad)*(1.0-secondary*0.34);
-  float brightCore=softExposure(q2,axes2*0.60);
-  // Low-frequency mottling without dividing the image into polygons.
-  leakMask*=0.89+0.11*n1;
-  leakMask=sat(leakMask);
-
-  vec2 px=vec2(1.0)/uResolution;
-  vec2 flow=tangent;
-  vec3 bleedA=texM(uv+flow*px*mix(2.0,8.0,amt)*leakMask);
-  vec3 bleedB=texM(uv-flow*px*mix(1.0,6.0,ch)*leakMask);
-  vec3 bleedMix=vec3(bleedA.r,base.g,bleedB.b);
-
-  vec3 deepWarm=mix(vec3(0.60,0.035,0.08),uC0,0.16);
-  vec3 redWarm=mix(vec3(0.91,0.09,0.075),uC0,0.20);
-  vec3 magentaWarm=mix(vec3(0.87,0.20,0.34),uC2,0.24);
-  vec3 amberWarm=mix(vec3(1.0,0.66,0.36),uC1,0.17);
-  if(family < 1.0){
-    redWarm=mix(redWarm,vec3(0.97,0.12,0.08),0.24);
-  }else if(family < 2.0){
-    amberWarm=mix(amberWarm,vec3(1.0,0.69,0.29),0.25);
-  }else if(family < 3.0){
-    deepWarm=mix(deepWarm,vec3(0.73,0.03,0.14),0.24);
   }else if(family < 4.0){
-    magentaWarm=mix(magentaWarm,vec3(0.93,0.24,0.34),0.25);
+    anchor=vec2(1.12,mix(0.18,0.82,uH0.x));
+    tangent=vec2(0.0,1.0); inward=vec2(-1.0,0.0);
   }else{
-    magentaWarm=mix(magentaWarm,vec3(0.86,0.13,0.28),0.30);
+    anchor=vec2(mix(0.16,0.84,uH0.x),-0.10);
+    tangent=vec2(1.0,0.0); inward=vec2(0.0,1.0);
   }
 
-  // Grade the photograph as before, but apply only one restrained light
-  // exposure instead of stacking several near-white screen layers.
-  vec3 filtered=contrastSat(base,0.05+0.10*amt,1.05+0.15*amt);
-  filtered=paletteWash(filtered,mix(uC0,deepWarm,0.62),
-                        mix(uC1,redWarm,0.40),
-                        mix(amberWarm,magentaWarm,0.36),0.20+0.30*amt);
-  filtered=splitTone(filtered,deepWarm,amberWarm,0.12+0.18*ch);
-  filtered=hueRotate(filtered,(uR1.z-0.5)*0.11+(n0-0.5)*0.04);
-  filtered=mix(filtered,bleedMix,(0.05+0.11*amt)*leakMask
-                                  *(1.0-0.16*guard));
+  float n0 = fbm6(rot2(p,(uR0.x-0.5)*0.7)*1.8 + vec2(uSeed*0.013, 11.0));
+  float n1 = fbm4(rot2(p,(uR0.y-0.5)*1.2)*3.4 + vec2(31.0, uSeed*0.019));
+  float n2 = fbm4(p*2.6 + vec2(uSeed*0.021, 71.0));
+  float n3 = fbm6(rot2(p,1.1)*1.9 + vec2(57.0, uSeed*0.015));
 
-  float warmMix=sat(0.24+0.47*secondary+0.23*n2);
-  vec3 leakColor=mix(mix(deepWarm,redWarm,0.78),
-                     mix(magentaWarm,amberWarm,0.42+0.30*n1),warmMix);
-  vec3 outc=mix(filtered,leakColor,
-                 leakMask*(0.19+0.30*amt)*(1.0-0.10*guard));
-  outc=screenBlend(outc,redWarm*leakMask*(0.045+0.10*amt));
-  outc=screenBlend(outc,amberWarm*brightCore*(0.035+0.08*amt));
-  // Bright core is translucent and cannot turn broad areas into pure white.
-  float lift=brightCore*(0.025+0.075*amt)*(1.0-lum(base)*0.3);
-  outc=mix(outc,vec3(1.0,0.90,0.80),lift);
-  float veil=smoothstep(0.22,0.90,n0+n2*0.30)
-             *leakMask*(0.055+0.11*amt);
-  outc=screenBlend(outc,mix(redWarm,magentaWarm,0.32)*veil);
+  vec2 rel = uv - anchor;
+  float depth = dot(rel, inward);
+  float along = dot(rel, tangent);
+  float boundaryWarp = (n0 - 0.5) * (0.08 + 0.08*ch) + (n2 - 0.5) * 0.05;
+  float boundary = mix(0.18, 0.55, uH0.y) + boundaryWarp;
+  float softness = mix(0.16, 0.36, uH1.x) + 0.08*amt;
 
-  float leakGrain=(hash21(floor(uv*uResolution)+uSeed*37.0)-0.5)
-                  *(0.005+0.008*amt);
-  outc+=vec3(leakGrain);
-  outc=preserveSource(base,outc);
-  vec3 tone=paletteWash(outc,deepWarm,mix(redWarm,magentaWarm,0.40),
-                         amberWarm,0.20+0.23*amt);
-  tone=splitTone(tone,mix(deepWarm,magentaWarm,0.35),
-                 amberWarm,0.12+0.15*amt);
-  tone=hueRotate(tone,(uR0.z-0.5)*0.09);
-  tone=contrastSat(tone,0.035+0.08*amt,1.03+0.10*amt);
-  outc=mix(outc,tone,0.37+0.20*amt);
-  outc=softShoulder(outc);
-  gl_FragColor=vec4(clamp(outc,0.0,1.0),1.0);
+  // Main dyed slab entering from one side. The boundary is soft and gently
+  // warped so it reads as a filter stain rather than a hard geometric split.
+  float slab = 1.0 - smoothstep(boundary - softness, boundary + softness, depth);
+  slab *= 0.86 + 0.14 * smoothstep(-0.35, 0.85, along + (n1-0.5)*0.22);
+  slab *= 0.93 + 0.07*n3;
+
+  vec2 c1 = anchor + inward*(boundary*0.60) + tangent*((uR1.x-0.5)*0.52);
+  vec2 c2 = anchor + inward*(boundary*0.98) + tangent*((uR1.y-0.5)*0.72);
+  vec2 c3 = anchor + inward*(boundary*0.40) + tangent*((uR2.x-0.5)*0.38);
+
+  vec2 r1 = horizontalEdge ? vec2(mix(0.55,1.15,uH1.y), mix(0.18,0.38,uH2.x))
+                           : vec2(mix(0.18,0.38,uH2.x), mix(0.55,1.15,uH1.y));
+  vec2 r2 = horizontalEdge ? vec2(mix(0.25,0.75,uH2.y), mix(0.12,0.28,uR0.z))
+                           : vec2(mix(0.12,0.28,uR0.z), mix(0.25,0.75,uH2.y));
+  vec2 r3 = horizontalEdge ? vec2(mix(0.14,0.35,uR1.z), mix(0.07,0.16,uR1.w))
+                           : vec2(mix(0.07,0.16,uR1.w), mix(0.14,0.35,uR1.z));
+
+  float veilA = gauss2(uv - c1 + vec2((n1-0.5)*0.05,(n2-0.5)*0.05), r1);
+  float veilB = gauss2(uv - c2 + vec2((n0-0.5)*0.03,(n3-0.5)*0.03), r2);
+  float veilC = gauss2(uv - c3, r3);
+
+  float mask = max(slab, veilA*0.92);
+  mask = max(mask, veilB*0.78);
+  mask = max(mask, veilC*0.46);
+  mask *= 0.90 + 0.10*n1;
+  mask = sat(mask);
+
+  // A reveal zone lets the underlying photo show through more clearly inside
+  // the leak, similar to translucent colored film rather than opaque paint.
+  float reveal = veilB * (0.35 + 0.45*amt) + veilC * 0.22;
+  reveal *= 1.0 - 0.18*guard;
+  reveal = sat(reveal);
+
+  // Palette-led coloration: mutate must change the filter color family.
+  vec3 filterDark = mix(uC0, uC2, 0.25 + 0.45*n0);
+  vec3 filterMid  = mix(uC1, uC0, 0.30 + 0.40*n1);
+  vec3 filterLight= mix(uC2, uC1, 0.55 + 0.25*n2);
+  if(family < 1.0){
+    filterMid = mix(filterMid, uC1, 0.20);
+  }else if(family < 2.0){
+    filterDark = mix(filterDark, uC0, 0.18);
+  }else if(family < 3.0){
+    filterLight = mix(filterLight, uC2, 0.22);
+  }else if(family < 4.0){
+    filterMid = mix(filterMid, mix(uC0,uC2,0.5), 0.20);
+  }else{
+    filterDark = mix(filterDark, filterLight, 0.24);
+  }
+
+  vec3 baseGrade = contrastSat(base, 0.03 + 0.06*amt, 1.02 + 0.08*amt);
+  baseGrade = paletteWash(baseGrade, filterDark, filterMid, filterLight,
+                          0.08 + 0.14*amt);
+  baseGrade = splitTone(baseGrade, filterDark, filterLight, 0.06 + 0.10*ch);
+
+  float gradient = sat(0.18 + 0.55*slab + 0.24*veilA + 0.18*n2);
+  vec3 filterColor = mix(filterDark, filterMid, gradient);
+  filterColor = mix(filterColor, filterLight, 0.22 + 0.55*veilB);
+  filterColor = hueRotate(filterColor, (uR2.z - 0.5) * 0.22);
+
+  // Build the leak mainly as a tinted veil with moderate screen lift.
+  vec3 outc = mix(baseGrade, baseGrade * mix(vec3(1.0), filterColor, 0.80),
+                  mask * (0.28 + 0.34*amt) * (1.0 - 0.08*guard));
+  outc = mix(outc, filterColor, mask * (0.10 + 0.28*amt) * (1.0 - 0.10*guard));
+  outc = screenBlend(outc, filterColor * mask * (0.04 + 0.12*amt));
+
+  // Translucent reveal: the photo becomes more visible within some areas of
+  // the colored slab instead of being buried by white glare.
+  vec3 revealed = paletteWash(base, filterMid, filterLight, filterDark,
+                              0.10 + 0.12*amt);
+  revealed = contrastSat(revealed, 0.00 + 0.04*amt, 1.00 + 0.06*amt);
+  outc = mix(outc, revealed, reveal * (0.22 + 0.34*ch));
+
+  // Only a soft highlight remains; no aggressive white beam.
+  float glow = veilC * (0.015 + 0.055*amt) * (1.0 - lum(base)*0.25);
+  outc = mix(outc, screenBlend(outc, filterLight * 0.70 + vec3(0.18)), glow);
+
+  float grain = (hash21(floor(uv*uResolution)+uSeed*37.0)-0.5) * (0.004 + 0.007*amt);
+  outc += vec3(grain);
+
+  outc = preserveSource(base, outc);
+  vec3 tone = paletteWash(outc, filterDark, filterMid, filterLight,
+                          0.10 + 0.16*amt);
+  tone = splitTone(tone, mix(filterDark,filterMid,0.35), filterLight,
+                   0.06 + 0.10*amt);
+  tone = contrastSat(tone, 0.025 + 0.05*amt, 1.02 + 0.08*amt);
+  outc = mix(outc, tone, 0.24 + 0.18*amt);
+  outc = softShoulder(outc);
+  gl_FragColor = vec4(clamp(outc,0.0,1.0), 1.0);
 }`;
-
 const PALETTES = [
   {name:'EMBER FILM', c0:[0.95,0.58,0.32], c1:[1.00,0.85,0.55], c2:[0.98,0.48,0.66]},
   {name:'MINT BATH', c0:[0.55,0.84,0.67], c1:[0.74,0.92,0.88], c2:[0.90,0.98,0.96]},
