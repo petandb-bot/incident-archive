@@ -8,27 +8,44 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Incident Archive">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="description" content="Incident Archive — tuned chance-driven photographic incidents">
+  <meta name="description" content="Incident Archive — chance-driven photographic incidents with graphic minimal UI and leak mode">
   <title>Incident Archive</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icons/icon-180.png">
-  <link rel="stylesheet" href="./style.css?v=0271">
+  <link rel="stylesheet" href="./style.css?v=0280">
 </head>
 <body>
   <div class="ambient" aria-hidden="true"><i></i><i></i><i></i></div>
   <main class="app-shell">
     <header class="masthead">
       <div class="wordmark"><span>INCIDENT</span><span>ARCHIVE</span></div>
-      <span class="version">0.2.7.1</span>
+      <span class="version">0.2.8</span>
       <button id="openPhotoTop" class="open-top" type="button">OPEN</button>
     </header>
 
     <section class="image-world" id="stage" aria-label="image stage">
       <div id="canvasMount" class="canvas-mount"></div>
       <div id="emptyState" class="empty-state">
-        <div class="empty-plate" aria-hidden="true">
-          <div class="plate-exposure"></div>
-          <div class="plate-meta"><span>NO IMAGE</span><span>01 / IA</span></div>
+        <div class="empty-poster" aria-hidden="true">
+          <div class="poster-aura"></div>
+          <div class="poster-frame">
+            <div class="poster-grid"></div>
+            <div class="poster-panel poster-panel-a"></div>
+            <div class="poster-panel poster-panel-b"></div>
+            <div class="poster-window">
+              <div class="poster-window-mark"></div>
+              <div class="poster-window-lines"></div>
+              <div class="poster-window-dots"></div>
+            </div>
+            <div class="poster-legend-top"><span>INCIDENT / ARCHIVE</span><span>OPTICAL INDEX</span></div>
+            <div class="poster-legend-bottom"><span>LIGHT / COLOR / TRACE / LEAK</span><span>READY FOR INPUT</span></div>
+          </div>
+          <div class="poster-icons">
+            <div class="poster-icon-card"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="7" y="7" width="34" height="34" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M24 10v28M10 24h28" stroke="currentColor" stroke-width="1.25" opacity=".52"/><circle cx="24" cy="24" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M24 5.8v5.4M24 36.8v5.4M5.8 24h5.4M36.8 24h5.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="square"/></svg><span>SOLAR</span></div>
+            <div class="poster-icon-card"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="7" y="7" width="34" height="34" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M16 14h16l4 9c-2.8 4.5-6.8 8.8-12 11.2C18.8 31.8 14.8 27.5 12 23l4-9Z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M15 22h18" stroke="currentColor" stroke-width="1.2" opacity=".55"/></svg><span>CHEMICAL</span></div>
+            <div class="poster-icon-card"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="7" y="7" width="34" height="34" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="14.5" y="15" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="19.5" y="19" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" opacity=".6"/><path d="M14.5 34h19" stroke="currentColor" stroke-width="1.2" opacity=".55"/></svg><span>REGISTER</span></div>
+            <div class="poster-icon-card"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="7" y="7" width="34" height="34" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="12" y="18" width="24" height="12" fill="currentColor" opacity=".08"/><path d="M13 18h22v12H13z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M13 24h22" stroke="currentColor" stroke-width="1.2" opacity=".55"/><path d="M9 21h6M33 27h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>LEAK</span></div>
+          </div>
         </div>
         <button id="openPhotoPrimary" class="open-primary" type="button">OPEN</button>
       </div>
@@ -40,7 +57,7 @@
         <button class="mode active" data-mode="SOLAR" type="button" aria-pressed="true"><span>SOLAR</span></button>
         <button class="mode" data-mode="CHEMICAL" type="button" aria-pressed="false"><span>CHEMICAL</span></button>
         <button class="mode" data-mode="REGISTER" type="button" aria-pressed="false"><span>REGISTER</span></button>
-        <button class="mode" data-mode="LATENT" type="button" aria-pressed="false"><span>LATENT</span></button>
+        <button class="mode" data-mode="LEAK" type="button" aria-pressed="false"><span>LEAK</span></button>
       </nav>
 
       <button id="mutateButton" class="mutate-button" type="button"><span>MUTATE</span></button>
@@ -84,7 +101,7 @@
 
   <input id="photoInput" type="file" accept="image/*" hidden>
   <script src="https://cdn.jsdelivr.net/npm/p5@1.11.13/lib/p5.min.js"></script>
-  <script src="./sketch.js?v=0271"></script>
+  <script src="./sketch.js?v=0280"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).catch(console.warn));

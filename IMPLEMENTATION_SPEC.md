@@ -1,3 +1,5 @@
+v0.2.8 Graphic UI Refresh
+
 # Incident Archive v0.2.3 — Rendering correction
 
 Observed defect: exported CHEMICAL images showed a hard vertical seam at the exact image midpoint and large diagonal triangle boundaries.
@@ -15,4 +17,4 @@ Fix:
 - SOLAR: intensity slightly reduced for better usability on portraits while keeping optical flare/ray behavior.
 - CHEMICAL: softened destructive drift and tuned dye behavior for higher hit-rate on people.
 - REGISTER: kept close to v0.2.5 with minor subject protection.
-- LATENT: renamed from PHOTOGRAM and reworked toward latent-image / density-plate behavior, differentiated from CHEMICAL.
+- LEAK: renamed from PHOTOGRAM and reworked toward large color-leak / film-burn behavior with bold field overlays, differentiated from CHEMICAL and REGISTER.

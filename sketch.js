@@ -3,7 +3,7 @@
 window.IA_SCRIPT_LOADED = true;
 
 const APP = {
-  version: '0.2.7.1',
+  version: '0.2.8',
   mode: 'SOLAR',
   params: { amount: 88, chance: 80, preserve: 22 },
   recipe: null,
@@ -250,105 +250,115 @@ void main(){
 }`;
 
 
-const LATENT_FRAG = COMMON + `
-float latentField(vec2 p, float seedA, float seedB){
-  vec2 q = rot2(p, mix(-1.2,1.2,uH0.x));
-  q += vec2(
-    fbm4(q*1.8+vec2(seedA,7.0))-0.5,
-    fbm4(rot2(q,0.82)*1.9+vec2(11.0,seedB))-0.5
-  ) * (0.12+0.10*uH1.x);
-  float broad=fbm6(q*1.9+vec2(seedA*0.6,seedB*0.3));
-  float detail=fbm4(q*4.8+vec2(seedB*0.8,seedA*0.5));
-  float veil=0.5+0.5*sin((q.x*0.52+q.y*0.84)*mix(3.4,6.2,uH2.x)+broad*3.0);
-  return broad*0.68 + detail*0.18 + veil*0.14;
+const LEAK_FRAG = COMMON + `
+float bandSoft(float x, float c, float w, float blur){
+  return 1.0 - smoothstep(w, w + blur, abs(x - c));
+}
+vec3 leakRamp(float t, vec3 a, vec3 b, vec3 c){
+  vec3 ab = mix(a, b, smoothstep(0.0, 0.65, t));
+  return mix(ab, c, smoothstep(0.58, 1.0, t));
 }
 void main(){
-  vec2 uv=screenUV();
-  vec2 p=uv-0.5;
-  vec3 base=texM(uv);
-  float amt=uAmount, ch=uChance;
+  vec2 uv = screenUV();
+  vec2 p = uv - 0.5;
+  vec3 base = texM(uv);
+  float amt = uAmount, ch = uChance;
   float guard = subjectGuard(uv, base);
 
-  float f0=latentField(p,uSeed*0.021+3.0,uSeed*0.013+17.0);
-  float f1=latentField(rot2(p,0.56)+vec2(0.08,-0.04),uSeed*0.017+29.0,uSeed*0.011+41.0);
-  float field=mix(f0,max(f0,f1),0.42+0.18*ch);
+  float angle = mix(-0.32, 0.32, uR0.x) + mix(-0.18, 0.18, uR0.y);
+  vec2 q = rot2(p, angle);
+  float n0 = fbm6(q * 1.8 + vec2(uSeed * 0.013, 13.0));
+  float n1 = fbm4(q * 4.6 + vec2(19.0, uSeed * 0.017));
+  float n2 = fbm4(rot2(q, 1.18) * 3.0 + vec2(uSeed * 0.011, 51.0));
 
-  float contact=smoothstep(0.40,0.76,field);
-  float core=smoothstep(0.54,0.90,field);
-  float halo=max(0.0,smoothstep(0.28,0.52,field)-smoothstep(0.66,0.90,field));
-  float fringe=pow(ridge(0.5+0.5*sin((rot2(p,uR1.x*2.0-1.0).y+f1*0.14)*mix(12.0,30.0,uR1.y))),10.0);
-  fringe*=smoothstep(0.34,0.78,f0);
+  float family = floor(uR2.w * 5.0);
+  float axis = (family < 2.0) ? q.y : q.x;
+  float crossAxis = (family < 2.0) ? q.x : q.y;
 
-  vec2 px=vec2(1.0)/uResolution;
-  vec2 drift=vec2(fbm4(p*2.2+vec2(71.0,uSeed*0.01))-0.5,fbm4(p*2.1+vec2(uSeed*0.013,83.0))-0.5);
-  vec3 shifted=texM(uv+drift*px*mix(2.0,10.0,amt)*(0.35+0.65*(1.0-guard))*contact);
-  vec3 shiftedB=texM(uv-drift*px*mix(1.0,7.0,amt)*(0.24+0.44*ch)*(0.4+0.6*contact));
-  vec3 negative=vec3(1.0)-shifted;
-  float yb=lum(base);
-  float ys=lum(shifted);
+  float center = mix(-0.16, 0.16, uH0.x) + (n0 - 0.5) * 0.12;
+  float width = mix(0.22, 0.48, uH0.y) * (0.72 + 0.52 * amt);
+  float blur = mix(0.08, 0.22, uH1.x);
+  float band = bandSoft(axis, center, width, blur);
 
-  float edgeA=edge(uv, 1.8/uResolution.x);
-  float edgeB=edge(uv+drift*px*2.0, 3.0/uResolution.x);
-  float contour=smoothstep(0.05,0.28, max(edgeA, edgeB));
+  float revealCenter = center + mix(-0.08, 0.08, uH2.x);
+  float reveal = bandSoft(axis, revealCenter, width * 0.16, blur * 0.65);
+  float hotCore = bandSoft(axis, center + mix(-0.03, 0.03, uH1.y), width * 0.08, blur * 0.55);
+  float haze = bandSoft(axis, center, width * 1.25, blur * 1.35);
 
-  vec3 silver = mix(vec3(ys), mix(vec3(0.94,0.94,0.96), uC1, 0.12), 0.18+0.10*uR2.x);
-  vec3 paper = mix(vec3(0.985,0.982,0.972), uC2, 0.06+0.05*uR2.y);
-  vec3 lavender = mix(silver, vec3(0.92,0.90,0.98), 0.18+0.12*uR2.z);
-  vec3 latent = shifted;
+  float edgeTop = 1.0 - smoothstep(-0.52, 0.18, q.y);
+  float edgeBottom = smoothstep(-0.18, 0.52, q.y);
+  float edgeLeft = 1.0 - smoothstep(-0.52, 0.18, q.x);
+  float edgeRight = smoothstep(-0.18, 0.52, q.x);
+  float edgeAnchor = edgeTop;
+  if(family >= 1.0 && family < 2.0) edgeAnchor = edgeBottom;
+  if(family >= 2.0 && family < 3.0) edgeAnchor = edgeLeft;
+  if(family >= 3.0) edgeAnchor = edgeRight;
 
-  float family=floor(uR2.w*5.0);
-  if(family<1.0){
-    latent = mix(shifted, silver, 0.44+0.24*amt);
-    latent = mix(latent, negative, 0.08+0.10*ch);
-  }else if(family<2.0){
-    latent = mix(shifted, negative, 0.24+0.24*amt);
-    latent = mix(latent, silver, 0.24+0.16*ch);
-  }else if(family<3.0){
-    latent = mix(shifted, lavender, 0.48+0.24*amt);
-    latent = screenBlend(latent, paper*(0.08+0.12*amt));
-  }else if(family<4.0){
-    vec3 fogged = mix(shifted, paper, 0.40+0.26*amt);
-    latent = mix(fogged, negative, 0.10+0.16*ch);
+  float spread = exp(-pow((crossAxis - mix(-0.24, 0.24, uR1.x)) / max(0.16, mix(0.22, 0.48, uR1.y)), 2.0));
+  float flare = edgeAnchor * spread;
+  float leakMask = max(band * (0.42 + 0.58 * edgeAnchor), haze * flare * (0.36 + 0.34 * ch));
+  leakMask = clamp(leakMask, 0.0, 1.0);
+
+  vec2 px = vec2(1.0) / uResolution;
+  vec2 flow = vec2(cos(angle + 1.5707963), sin(angle + 1.5707963));
+  vec3 bleedA = texM(uv + flow * px * mix(2.0, 10.0, amt) * (0.25 + 0.75 * leakMask));
+  vec3 bleedB = texM(uv - flow * px * mix(1.0, 7.0, ch) * (0.20 + 0.65 * leakMask));
+  vec3 bleedMix = vec3(bleedA.r, base.g, bleedB.b);
+
+  vec3 deepWarm = mix(vec3(0.62, 0.02, 0.04), uC0, 0.18);
+  vec3 redWarm  = mix(vec3(0.94, 0.06, 0.03), uC0, 0.24);
+  vec3 magentaWarm = mix(vec3(0.92, 0.18, 0.30), uC2, 0.28);
+  vec3 hotWarm  = mix(vec3(1.0, 0.82, 0.62), uC1, 0.20);
+  vec3 paperHot = mix(vec3(1.0, 0.98, 0.92), uC1, 0.08);
+
+  if(family < 1.0){
+    redWarm = mix(redWarm, vec3(0.96, 0.08, 0.02), 0.28);
+  }else if(family < 2.0){
+    magentaWarm = mix(magentaWarm, vec3(0.98, 0.28, 0.14), 0.26);
+  }else if(family < 3.0){
+    deepWarm = mix(deepWarm, vec3(0.78, 0.00, 0.08), 0.28);
+  }else if(family < 4.0){
+    hotWarm = mix(hotWarm, vec3(1.0, 0.88, 0.70), 0.24);
   }else{
-    vec3 paleNeg = mix(negative, paper, 0.54);
-    latent = mix(shiftedB, paleNeg, 0.28+0.24*amt);
+    magentaWarm = mix(magentaWarm, vec3(0.86, 0.08, 0.22), 0.24);
+    paperHot = mix(paperHot, vec3(1.0, 0.99, 0.96), 0.12);
   }
 
-  float latentMix = (0.42+0.30*amt)*(1.0-0.08*guard);
-  vec3 outc=mix(base,latent,contact*latentMix);
+  vec3 filtered = base;
+  filtered = contrastSat(filtered, 0.08 + 0.16 * amt, 1.08 + 0.24 * amt);
+  filtered = paletteWash(filtered, mix(uC0, deepWarm, 0.60), mix(uC1, redWarm, 0.42), mix(hotWarm, magentaWarm, 0.38), 0.28 + 0.42 * amt);
+  filtered = splitTone(filtered, deepWarm, hotWarm, 0.18 + 0.24 * ch);
+  filtered = hueRotate(filtered, (uR1.z - 0.5) * 0.14 + (n0 - 0.5) * 0.06);
+  filtered = mix(filtered, bleedMix, (0.08 + 0.16 * amt) * (0.20 + 0.80 * leakMask) * (1.0 - 0.14 * guard));
 
-  vec3 fogPlate = mix(paper, lavender, field*0.26 + contour*0.12);
-  outc = mix(outc, fogPlate, halo*(0.10+0.18*amt));
-  outc = screenBlend(outc,paper*halo*(0.08+0.22*amt));
-  outc = screenBlend(outc,lavender*fringe*(0.08+0.18*ch));
-  outc = screenBlend(outc, mix(vec3(1.0), paper, 0.55)*contour*contact*(0.05+0.16*amt));
-  outc = mix(outc, vec3(1.0), core*(0.04+0.10*amt)*(1.0-yb*0.30));
+  float rampT = clamp(leakMask * 0.72 + n1 * 0.20 + hotCore * 0.25, 0.0, 1.0);
+  vec3 leakColor = leakRamp(rampT, deepWarm, mix(redWarm, magentaWarm, 0.36), hotWarm);
 
-  float density=smoothstep(0.0,0.58,1.0-yb) * (0.07+0.16*amt) * contact;
-  outc *= 1.0-density*(0.42+0.38*(1.0-core));
+  vec3 outc = filtered;
+  outc = mix(outc, leakColor, leakMask * (0.34 + 0.50 * amt));
+  outc = screenBlend(outc, leakColor * haze * (0.14 + 0.28 * amt));
+  outc = screenBlend(outc, hotWarm * flare * (0.18 + 0.32 * amt));
+  outc = screenBlend(outc, paperHot * hotCore * (0.24 + 0.54 * amt));
 
-  vec3 emboss = abs(shifted - shiftedB);
-  vec3 plateEdge = mix(silver, paper, 0.58) + emboss*0.75;
-  outc = mix(outc, plateEdge, contour*(0.16+0.22*amt)*(0.45+0.55*contact));
+  vec3 revealMix = mix(filtered, base, 0.58);
+  outc = mix(outc, revealMix, reveal * (0.16 + 0.34 * ch));
+  outc = mix(outc, vec3(1.0), hotCore * (0.10 + 0.34 * amt) * (1.0 - lum(base) * 0.42));
 
-  float silverDust = pow(hash21(floor(uv*uResolution*0.13)+uSeed*17.0),17.0)*contact*(0.024+0.050*amt);
-  outc=mix(outc,paper,silverDust);
+  float veil = smoothstep(0.24, 0.88, n0 + n2 * 0.35) * leakMask * (0.10 + 0.22 * amt);
+  outc = screenBlend(outc, mix(redWarm, hotWarm, 0.65) * veil);
+  float hazeTint = smoothstep(0.18, 0.96, leakMask + (n2 - 0.5) * 0.18) * (0.08 + 0.16 * ch);
+  outc = mix(outc, mix(outc, magentaWarm, 0.36), hazeTint * (0.35 + 0.65 * (1.0 - guard)));
 
-  float latentWash = smoothstep(0.30,0.84, field) * (0.18+0.22*amt);
-  vec3 washTone = mix(silver, lavender, 0.35+0.25*sin(field*8.0 + uSeed*0.01));
-  outc = mix(outc, washTone, latentWash*(0.22+0.18*(1.0-guard)));
-
-  outc=mix(outc,hsvShiftLike(outc,0.08+uR1.z*0.16),0.12+0.18*ch);
-  outc+=vec3((hash21(floor(uv*uResolution)+uSeed*47.0)-0.5)*(0.005+0.007*amt));
-  outc=preserveSource(base,outc);
-
-  vec3 latentTone = paletteWash(outc, mix(paper,vec3(0.92,0.94,1.0),0.30), lavender, vec3(1.0,0.995,0.985), 0.34+0.28*amt);
-  latentTone = splitTone(latentTone, mix(silver,paper,0.40), mix(lavender,vec3(1.0),0.24), 0.28+0.24*amt);
-  latentTone = hueRotate(latentTone, (uR2.z-0.5)*0.16 + (field-0.5)*0.06);
-  latentTone = contrastSat(latentTone, 0.06+0.10*amt, 0.88+0.08*amt);
-  outc = mix(outc, latentTone, 0.58+0.22*amt);
-  outc=softShoulder(outc);
-  gl_FragColor=vec4(clamp(outc,0.0,1.0),1.0);
+  float leakGrain = (hash21(floor(uv * uResolution) + uSeed * 37.0) - 0.5) * (0.005 + 0.009 * amt);
+  outc += vec3(leakGrain);
+  outc = preserveSource(base, outc);
+  vec3 leakTone = paletteWash(outc, deepWarm, mix(redWarm, magentaWarm, 0.4), hotWarm, 0.26 + 0.30 * amt);
+  leakTone = splitTone(leakTone, mix(deepWarm, magentaWarm, 0.35), paperHot, 0.16 + 0.22 * amt);
+  leakTone = hueRotate(leakTone, (uR0.z - 0.5) * 0.10 + hotCore * 0.05);
+  leakTone = contrastSat(leakTone, 0.04 + 0.12 * amt, 1.04 + 0.16 * amt);
+  outc = mix(outc, leakTone, 0.44 + 0.24 * amt);
+  outc = softShoulder(outc);
+  gl_FragColor = vec4(clamp(outc, 0.0, 1.0), 1.0);
 }`;
 
 
@@ -365,7 +375,7 @@ const FAMILIES = {
   SOLAR:['SABATTIER','METALLIC','FLASHLINE','PARTIAL NEGATIVE','OVEREXPOSE'],
   CHEMICAL:['BLEACH BATH','DYE FAILURE','DEVELOPER SURGE','CROSS BATH','SILVER RESIDUE'],
   REGISTER:['OFFSET','SLIT','DOUBLE', 'MISALIGN', 'PLATE SHIFT'],
-  LATENT:['SILVER GHOST','PLATE BLOOM','DENSITY VEIL','PALE CONTACT','AFTERIMAGE']
+  LEAK:['RED FLOOD','LIGHT LEAK','HEAT GATE','EMULSION BLEED','WHITE BURST']
 };
 
 let ui = {};
@@ -383,7 +393,7 @@ function setup(){
     APP.shaders.SOLAR = createShader(VERT, SOLAR_FRAG);
     APP.shaders.CHEMICAL = createShader(VERT, CHEMICAL_FRAG);
     APP.shaders.REGISTER = createShader(VERT, REGISTER_FRAG);
-    APP.shaders.LATENT = createShader(VERT, LATENT_FRAG);
+    APP.shaders.LEAK = createShader(VERT, LEAK_FRAG);
     APP.recipe = makeRecipe(APP.mode);
     APP.ready = true;
     wireUI();
@@ -552,8 +562,8 @@ function makeRecipe(mode){
   if(mode==='SOLAR'){
     recipe.r2[3]=fam==='FLASHLINE' ? 0.96+rnd()*0.04 : rnd()*0.72;
   }
-  if(mode==='LATENT'){
-    recipe.r2[3]=(familyIndex+0.18+rnd()*0.54)/FAMILIES.LATENT.length;
+  if(mode==='LEAK'){
+    recipe.r2[3]=(familyIndex+0.18+rnd()*0.54)/FAMILIES.LEAK.length;
   }
   return recipe;
 }
@@ -584,7 +594,7 @@ function shaderSourceFor(mode){
   if(mode==='SOLAR') return SOLAR_FRAG;
   if(mode==='CHEMICAL') return CHEMICAL_FRAG;
   if(mode==='REGISTER') return REGISTER_FRAG;
-  return LATENT_FRAG;
+  return LEAK_FRAG;
 }
 
 function renderPreview(){

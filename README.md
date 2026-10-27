@@ -1,3 +1,5 @@
+v0.2.8 Graphic UI Refresh
+
 # Incident Archive v0.2.7.1 — Preview Density Fix
 
 - Fixes preview-only edge stretching on Retina / high-DPI displays.
@@ -25,14 +27,14 @@ This revision fixes the center seam and large triangular discontinuities visible
 - SOLAR
 - CHEMICAL
 - REGISTER
-- LATENT
+- LEAK
 
 
 ## v0.2.7.1 tuning
 - SOLAR: intensity slightly reduced for better usability on portraits while keeping optical flare/ray behavior.
 - CHEMICAL: softened destructive drift and tuned dye behavior for higher hit-rate on people.
 - REGISTER: kept close to v0.2.5 with minor subject protection.
-- LATENT: renamed from PHOTOGRAM and reworked toward latent-image / density-plate behavior, differentiated from CHEMICAL.
+- LEAK: renamed from PHOTOGRAM and reworked toward large color-leak / film-burn behavior with bold field overlays, differentiated from CHEMICAL and REGISTER.
 
 
 - v0.2.7.1: stronger mode output, full-image color filtering, and richer whole-photo tone changes while keeping the same 4-mode structure.
