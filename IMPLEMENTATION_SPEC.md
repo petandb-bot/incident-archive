@@ -11,7 +11,7 @@ Fix:
 - Updated service-worker cache key and network-first handling for HTML/JS/CSS.
 
 
-## v0.2.7 tuning
+## v0.2.7.1 tuning
 - SOLAR: intensity slightly reduced for better usability on portraits while keeping optical flare/ray behavior.
 - CHEMICAL: softened destructive drift and tuned dye behavior for higher hit-rate on people.
 - REGISTER: kept close to v0.2.5 with minor subject protection.

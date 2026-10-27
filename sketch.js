@@ -3,7 +3,7 @@
 window.IA_SCRIPT_LOADED = true;
 
 const APP = {
-  version: '0.2.7',
+  version: '0.2.7.1',
   mode: 'SOLAR',
   params: { amount: 88, chance: 80, preserve: 22 },
   recipe: null,
@@ -249,6 +249,7 @@ void main(){
   gl_FragColor = vec4(clamp(outc,0.0,1.0),1.0);
 }`;
 
+
 const LATENT_FRAG = COMMON + `
 float latentField(vec2 p, float seedA, float seedB){
   vec2 q = rot2(p, mix(-1.2,1.2,uH0.x));
@@ -272,18 +273,23 @@ void main(){
   float f1=latentField(rot2(p,0.56)+vec2(0.08,-0.04),uSeed*0.017+29.0,uSeed*0.011+41.0);
   float field=mix(f0,max(f0,f1),0.42+0.18*ch);
 
-  float contact=smoothstep(0.46,0.78,field);
-  float core=smoothstep(0.56,0.92,field);
-  float halo=max(0.0,smoothstep(0.30,0.52,field)-smoothstep(0.66,0.90,field));
+  float contact=smoothstep(0.40,0.76,field);
+  float core=smoothstep(0.54,0.90,field);
+  float halo=max(0.0,smoothstep(0.28,0.52,field)-smoothstep(0.66,0.90,field));
   float fringe=pow(ridge(0.5+0.5*sin((rot2(p,uR1.x*2.0-1.0).y+f1*0.14)*mix(12.0,30.0,uR1.y))),10.0);
   fringe*=smoothstep(0.34,0.78,f0);
 
   vec2 px=vec2(1.0)/uResolution;
   vec2 drift=vec2(fbm4(p*2.2+vec2(71.0,uSeed*0.01))-0.5,fbm4(p*2.1+vec2(uSeed*0.013,83.0))-0.5);
   vec3 shifted=texM(uv+drift*px*mix(2.0,10.0,amt)*(0.35+0.65*(1.0-guard))*contact);
+  vec3 shiftedB=texM(uv-drift*px*mix(1.0,7.0,amt)*(0.24+0.44*ch)*(0.4+0.6*contact));
   vec3 negative=vec3(1.0)-shifted;
   float yb=lum(base);
   float ys=lum(shifted);
+
+  float edgeA=edge(uv, 1.8/uResolution.x);
+  float edgeB=edge(uv+drift*px*2.0, 3.0/uResolution.x);
+  float contour=smoothstep(0.05,0.28, max(edgeA, edgeB));
 
   vec3 silver = mix(vec3(ys), mix(vec3(0.94,0.94,0.96), uC1, 0.12), 0.18+0.10*uR2.x);
   vec3 paper = mix(vec3(0.985,0.982,0.972), uC2, 0.06+0.05*uR2.y);
@@ -292,42 +298,59 @@ void main(){
 
   float family=floor(uR2.w*5.0);
   if(family<1.0){
-    latent = mix(shifted, silver, 0.36+0.22*amt);
+    latent = mix(shifted, silver, 0.44+0.24*amt);
+    latent = mix(latent, negative, 0.08+0.10*ch);
   }else if(family<2.0){
-    latent = mix(shifted, negative, 0.16+0.20*amt);
-    latent = mix(latent, silver, 0.18+0.14*ch);
+    latent = mix(shifted, negative, 0.24+0.24*amt);
+    latent = mix(latent, silver, 0.24+0.16*ch);
   }else if(family<3.0){
-    latent = mix(shifted, lavender, 0.40+0.22*amt);
+    latent = mix(shifted, lavender, 0.48+0.24*amt);
+    latent = screenBlend(latent, paper*(0.08+0.12*amt));
   }else if(family<4.0){
-    vec3 fogged = mix(shifted, paper, 0.30+0.22*amt);
-    latent = mix(fogged, negative, 0.08+0.14*ch);
+    vec3 fogged = mix(shifted, paper, 0.40+0.26*amt);
+    latent = mix(fogged, negative, 0.10+0.16*ch);
   }else{
-    vec3 paleNeg = mix(negative, paper, 0.46);
-    latent = mix(shifted, paleNeg, 0.20+0.22*amt);
+    vec3 paleNeg = mix(negative, paper, 0.54);
+    latent = mix(shiftedB, paleNeg, 0.28+0.24*amt);
   }
 
-  float latentMix = (0.34+0.28*amt)*(1.0-0.10*guard);
+  float latentMix = (0.42+0.30*amt)*(1.0-0.08*guard);
   vec3 outc=mix(base,latent,contact*latentMix);
-  outc=screenBlend(outc,paper*halo*(0.08+0.16*amt));
-  outc=screenBlend(outc,lavender*fringe*(0.06+0.14*ch));
-  outc=mix(outc,vec3(1.0),core*(0.03+0.08*amt)*(1.0-yb*0.34));
 
-  float density=smoothstep(0.0,0.58,1.0-yb) * (0.05+0.12*amt) * contact;
-  outc *= 1.0-density*(0.45+0.35*(1.0-core));
+  vec3 fogPlate = mix(paper, lavender, field*0.26 + contour*0.12);
+  outc = mix(outc, fogPlate, halo*(0.10+0.18*amt));
+  outc = screenBlend(outc,paper*halo*(0.08+0.22*amt));
+  outc = screenBlend(outc,lavender*fringe*(0.08+0.18*ch));
+  outc = screenBlend(outc, mix(vec3(1.0), paper, 0.55)*contour*contact*(0.05+0.16*amt));
+  outc = mix(outc, vec3(1.0), core*(0.04+0.10*amt)*(1.0-yb*0.30));
+
+  float density=smoothstep(0.0,0.58,1.0-yb) * (0.07+0.16*amt) * contact;
+  outc *= 1.0-density*(0.42+0.38*(1.0-core));
+
+  vec3 emboss = abs(shifted - shiftedB);
+  vec3 plateEdge = mix(silver, paper, 0.58) + emboss*0.75;
+  outc = mix(outc, plateEdge, contour*(0.16+0.22*amt)*(0.45+0.55*contact));
 
   float silverDust = pow(hash21(floor(uv*uResolution*0.13)+uSeed*17.0),17.0)*contact*(0.024+0.050*amt);
   outc=mix(outc,paper,silverDust);
-  outc=mix(outc,hsvShiftLike(outc,0.05+uR1.z*0.12),0.08+0.16*ch);
+
+  float latentWash = smoothstep(0.30,0.84, field) * (0.18+0.22*amt);
+  vec3 washTone = mix(silver, lavender, 0.35+0.25*sin(field*8.0 + uSeed*0.01));
+  outc = mix(outc, washTone, latentWash*(0.22+0.18*(1.0-guard)));
+
+  outc=mix(outc,hsvShiftLike(outc,0.08+uR1.z*0.16),0.12+0.18*ch);
   outc+=vec3((hash21(floor(uv*uResolution)+uSeed*47.0)-0.5)*(0.005+0.007*amt));
   outc=preserveSource(base,outc);
-  vec3 latentTone = paletteWash(outc, mix(paper,vec3(0.92,0.94,1.0),0.24), lavender, vec3(1.0,0.995,0.985), 0.28+0.24*amt);
-  latentTone = splitTone(latentTone, mix(silver,paper,0.46), mix(lavender,vec3(1.0),0.18), 0.22+0.20*amt);
-  latentTone = hueRotate(latentTone, (uR2.z-0.5)*0.14);
-  latentTone = contrastSat(latentTone, 0.04+0.08*amt, 0.92+0.10*amt);
-  outc = mix(outc, latentTone, 0.46+0.22*amt);
+
+  vec3 latentTone = paletteWash(outc, mix(paper,vec3(0.92,0.94,1.0),0.30), lavender, vec3(1.0,0.995,0.985), 0.34+0.28*amt);
+  latentTone = splitTone(latentTone, mix(silver,paper,0.40), mix(lavender,vec3(1.0),0.24), 0.28+0.24*amt);
+  latentTone = hueRotate(latentTone, (uR2.z-0.5)*0.16 + (field-0.5)*0.06);
+  latentTone = contrastSat(latentTone, 0.06+0.10*amt, 0.88+0.08*amt);
+  outc = mix(outc, latentTone, 0.58+0.22*amt);
   outc=softShoulder(outc);
   gl_FragColor=vec4(clamp(outc,0.0,1.0),1.0);
 }`;
+
 
 const PALETTES = [
   {name:'EMBER FILM', c0:[0.95,0.58,0.32], c1:[1.00,0.85,0.55], c2:[0.98,0.48,0.66]},
@@ -342,7 +365,7 @@ const FAMILIES = {
   SOLAR:['SABATTIER','METALLIC','FLASHLINE','PARTIAL NEGATIVE','OVEREXPOSE'],
   CHEMICAL:['BLEACH BATH','DYE FAILURE','DEVELOPER SURGE','CROSS BATH','SILVER RESIDUE'],
   REGISTER:['OFFSET','SLIT','DOUBLE', 'MISALIGN', 'PLATE SHIFT'],
-  LATENT:['LATENT GHOST','SILVER TRACE','DENSITY MASK','PALE PLATE','EMERGENCE']
+  LATENT:['SILVER GHOST','PLATE BLOOM','DENSITY VEIL','PALE CONTACT','AFTERIMAGE']
 };
 
 let ui = {};
