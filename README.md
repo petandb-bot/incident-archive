@@ -1,24 +1,20 @@
-# NEGATIVE WEATHER v0.3.3 — Icon Refresh
+# INCIDENT ARCHIVE v0.2.9 · EDITORIAL GUI
 
-Photo-generated ambient, experimental beats, drone and color animation.
+This is a GUI-only revision of v0.2.8.
 
-## Use
-1. **SHOOT** to capture a photo, or **USE PHOTO LIBRARY** to choose one.
-2. **MUTATE** to generate another sound world from the same photo.
-3. **PLAY / STOP** to control the loop.
-4. **SAVE** to export WAV or the current PNG frame.
+- Photo engines unchanged: SOLAR / CHEMICAL / REGISTER / LEAK.
+- Redesigned single-column responsive interface, inspired by muted grey/lavender typography and a magenta action accent.
+- Original photo aspect ratio preserved in preview and high-resolution PNG export.
+- The top-right three-line icon **opens the photo picker**; it is not an inert menu.
+- MUTATE / EDIT / SAVE buttons are operational; BACK remains available in the metadata strip.
+- Edit panel retains AMOUNT / CHANCE / PRESERVE / export resolution.
+- Metadata displays filename and file modified date (not EXIF capture date).
+- PWA icon, theme, asset URLs, and Service Worker cache refreshed.
 
-## Update
-Upload the extracted files to the root of your GitHub repository (`main` branch). Keep GitHub Pages set to `main / (root)`.
+## Deployment
 
-## Fixes
-- Fixes a startup color error that froze the photograph animation.
-- Correctly removes the image placeholder after capture.
-- Reduces rendering load on mobile.
-- Keeps the current audio engines and visual style unchanged.
+Unzip the GitHub replacement ZIP into the **root** of your GitHub Pages repository, overwriting the previous files. After publishing, open the page again in Safari. For Safari's installed home-screen version, reopening may be needed for the updated Service Worker to activate.
 
+## Files
 
-## What changed in v0.3.3
-- New app icon with a stronger NEGATIVE WEATHER identity
-- Updated manifest and home-screen assets
-- No audio or animation changes
+`index.html`, `style.css`, `sketch.js`, `sw.js`, `manifest.webmanifest`, and `icons/`.
