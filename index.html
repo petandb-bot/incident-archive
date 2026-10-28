@@ -10,22 +10,22 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="description" content="Incident Archive — photographic chance engine">
   <title>Incident Archive</title>
-  <link rel="manifest" href="./manifest.webmanifest?v=0300">
-  <link rel="apple-touch-icon" href="./icons/icon-180.png?v=0300">
-  <link rel="stylesheet" href="./style.css?v=0300">
+  <link rel="manifest" href="./manifest.webmanifest?v=0302">
+  <link rel="apple-touch-icon" href="./icons/icon-180.png?v=0302">
+  <link rel="stylesheet" href="./style.css?v=0302">
 </head>
 <body>
   <main class="app-shell">
     <header class="masthead">
       <div class="wordmark" aria-label="Incident Archive"><span>INCIDENT</span><span>ARCHIVE</span></div>
-      <span class="version">0.3.0</span>
+      <span class="version">0.3.2</span>
       <button id="openPhotoTop" class="open-top" type="button" title="Open a photo" aria-label="Open a photo">
         <span class="menu-lines" aria-hidden="true"><i></i><i></i><i></i></span>
       </button>
     </header>
 
     <section class="image-world" id="stage" aria-label="Photograph preview">
-      <div id="canvasMount" class="canvas-mount"></div>
+      <div id="canvasMount" class="canvas-mount"><img id="originalOverlay" alt="Unmodified input photo" hidden></div>
       <div id="emptyState" class="empty-state">
         <div class="empty-glow" aria-hidden="true"></div>
         <div class="empty-copy"><span class="empty-index">I / A · 029</span><span class="empty-heading">AN IMAGE<br>CAN BECOME<br>AN INCIDENT.</span></div>
@@ -99,12 +99,14 @@
   <input id="photoInput" type="file" accept="image/*" hidden>
   <script src="https://cdn.jsdelivr.net/npm/p5@1.11.13/lib/p5.min.js"></script>
   <!-- Independent shader engines; load before main sketch. -->
-  <script src="./engines/chemical.js?v=0300"></script>
-  <script src="./engines/leak.js?v=0300"></script>
-  <script src="./sketch.js?v=0300"></script>
+  <script src="./engines/solar.js?v=0302"></script>
+  <script src="./engines/register.js?v=0302"></script>
+  <script src="./engines/chemical.js?v=0302"></script>
+  <script src="./engines/leak.js?v=0302"></script>
+  <script src="./sketch.js?v=0302"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=0300', {updateViaCache:'none'}).catch(console.warn));
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=0302', {updateViaCache:'none'}).catch(console.warn));
     }
   </script>
 </body>

@@ -116,3 +116,7 @@ input[type=range]::-moz-range-thumb{width:12px;height:12px;background:var(--pape
 .export-ready-link{display:inline-flex;align-items:center;justify-content:center;text-align:center;min-height:40px;padding:9px 12px;border:1px solid var(--hair);background:transparent;color:var(--ink);font:inherit;font-size:10px;letter-spacing:.09em;text-decoration:none;cursor:pointer;border-radius:0;-webkit-tap-highlight-color:transparent}
 .export-ready-link:first-child{background:var(--ink);color:#fff}
 @media(max-width:600px){.export-ready{align-items:stretch}.export-ready-actions{flex:1}.export-ready-link{flex:1;min-width:140px}}
+
+/* Hold the preview to compare against the exact, untouched input file. */
+#originalOverlay{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:3;pointer-events:none;user-select:none;-webkit-user-select:none;background:var(--stage)}
+#originalOverlay[hidden]{display:none!important}

@@ -1,5 +1,5 @@
-const CACHE='incident-archive-v0300';
-const CORE=['./','./index.html','./style.css?v=0300','./sketch.js?v=0300','./engines/chemical.js?v=0300','./engines/leak.js?v=0300','./manifest.webmanifest?v=0300','./icons/icon-180.png','./icons/icon-192.png','./icons/icon-512.png'];
+const CACHE='incident-archive-v0302';
+const CORE=['./','./index.html','./style.css?v=0302','./sketch.js?v=0302','./engines/solar.js?v=0302','./engines/register.js?v=0302','./engines/chemical.js?v=0302','./engines/leak.js?v=0302','./manifest.webmanifest?v=0302','./icons/icon-180.png','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting()));
 });
@@ -11,7 +11,7 @@ self.addEventListener('fetch',event=>{
  if(req.method!=='GET') return;
  const url=new URL(req.url);
  if(url.origin!==self.location.origin)return;
- const code=req.mode==='navigate'||/\/(index\.html|sketch\.js|style\.css|sw\.js|chemical\.js|leak\.js)$/.test(url.pathname);
+ const code=req.mode==='navigate'||/\/(index\.html|sketch\.js|style\.css|sw\.js|chemical\.js|leak\.js|solar\.js|register\.js)$/.test(url.pathname);
  if(code){
   event.respondWith(fetch(req).then(res=>{
    if(res.ok){const copy=res.clone();caches.open(CACHE).then(c=>c.put(req,copy)).catch(()=>{});}

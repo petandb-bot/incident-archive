@@ -1,5 +1,5 @@
 "use strict";
-// CHEMICAL: isolated engine rebuilt around fluid developer baths, not polygon cells.
+// CHEMICAL: intentional small-scale polygonal dye failures, localized color shifts.
 (() => {
 const UTILS = `
 precision highp float;
@@ -27,6 +27,7 @@ vec2 clampUV(vec2 uv){return clamp(uv, vec2(0.0), vec2(1.0));}
 vec3 texM(vec2 uv){return texture2D(uTex, clampUV(uv)).rgb;} 
 vec2 screenUV(){vec2 uv=gl_FragCoord.xy/max(uResolution,vec2(1.0));uv.y=1.0-uv.y;return uv;} 
 float hash21(vec2 p){p=fract(p*vec2(123.34,345.45));p+=dot(p,p+34.345);return fract(p.x*p.y);} 
+vec2 hash22(vec2 p){float n=hash21(p);float m=hash21(p+19.19);return vec2(n,m);} 
 float noise2(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);float a=hash21(i),b=hash21(i+vec2(1,0)),c=hash21(i+vec2(0,1)),d=hash21(i+vec2(1,1));return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);} 
 float fbm4(vec2 p){float v=0.0,a=0.52;mat2 m=mat2(1.57,1.11,-1.11,1.57);for(int i=0;i<4;i++){v+=a*noise2(p);p=m*p+13.71;a*=0.5;}return v;} 
 float fbm6(vec2 p){float v=0.0,a=0.54;mat2 m=mat2(1.72,1.20,-1.20,1.72);for(int i=0;i<6;i++){v+=a*noise2(p);p=m*p+17.31;a*=0.52;}return v;} 
@@ -64,8 +65,24 @@ vec3 contrastSat(vec3 c, float contrast, float satBoost){
 }
 vec3 preserveSource(vec3 base, vec3 processed){float k=sat(uPreserve);k=k*k*(3.0-2.0*k);float yp=max(lum(processed),0.002), yb=max(lum(base),0.016);vec3 src=clamp(base*(yp/yb),0.0,1.3);vec3 pc=processed-vec3(yp);vec3 sc=src-vec3(lum(src));return clamp(vec3(yp)+mix(pc,sc,k),0.0,1.35);} 
 vec3 softShoulder(vec3 c){return c/(vec3(1.0)+max(c-vec3(0.72),vec3(0.0))*0.96);} 
+float edge(vec2 uv,float px){vec2 dx=vec2(px,0.0), dy=vec2(0.0,px);float ex=abs(lum(texM(uv+dx))-lum(texM(uv-dx)));float ey=abs(lum(texM(uv+dy))-lum(texM(uv-dy)));return sat((ex+ey)*2.2);} 
 vec3 triPalette(float t){return clamp(0.56+0.44*cos(6.2831853*(fract(t)+vec3(0.0,0.33,0.67))),0.0,1.0);} 
-vec3 hsvShiftLike(vec3 c, float shift){ float y = lum(c); vec3 a = vec3(y); vec3 b = triPalette(y + shift); return mix(c, mix(a,b,0.72), 0.35);} 
+vec3 hsvShiftLike(vec3 c, float shift){float y = lum(c); vec3 a = vec3(y); vec3 b = triPalette(y + shift); return mix(c, mix(a,b,0.72), 0.35);} 
+
+void voronoiInfo(vec2 x, out float d1, out float d2, out vec2 cid, out vec2 bestR){
+  vec2 n=floor(x), f=fract(x);
+  d1=10.0; d2=10.0; cid=vec2(0.0); bestR=vec2(0.0);
+  for(int j=-1;j<=1;j++){
+    for(int i=-1;i<=1;i++){
+      vec2 g=vec2(float(i),float(j));
+      vec2 o=hash22(n+g+uSeed*0.071);
+      vec2 r=g+o-f;
+      float d=dot(r,r);
+      if(d<d1){d2=d1; d1=d; cid=n+g; bestR=r;}
+      else if(d<d2){d2=d;}
+    }
+  }
+}
 `;
 const FRAGMENT = UTILS + `
 void main(){
@@ -74,57 +91,73 @@ void main(){
   vec3 base = texM(uv);
   float amt = uAmount, ch = uChance;
 
-  // Fluid bath fields: no polygon or cell structures.
-  float bathA = fbm6(rot2(p,(uR0.x-0.5)*1.2)*2.6 + vec2(uSeed*0.013, 13.0));
-  float bathB = fbm4(rot2(p,(uR0.y-0.5)*1.8)*5.0 + vec2(25.0, uSeed*0.017));
-  float bathC = fbm4(p*3.8 + vec2(uSeed*0.021, 61.0));
+  // Two crystalline scales: medium facets and smaller grains.
+  float scaleA = mix(22.0, 35.0, uH0.x);
+  float scaleB = mix(37.0, 61.0, uH0.y);
+  vec2 aspect = vec2(uResolution.x/max(uResolution.y,1.0), 1.0);
+  vec2 vpA = rot2(uv*aspect, (uR0.x-0.5)*1.1) * scaleA;
+  vec2 vpB = rot2(uv*aspect, (uR0.y-0.5)*1.4) * scaleB;
 
-  vec2 flow = vec2(
-    fbm4(p*2.4 + vec2(uSeed*0.031, 7.0)) - 0.5,
-    fbm4(rot2(p,1.02)*2.9 + vec2(17.0, uSeed*0.037)) - 0.5
-  );
-  vec2 streak = vec2(0.0,1.0) * (bathC-0.5) * (0.004 + 0.016*amt);
-  vec2 drift = flow*(0.006 + 0.022*amt) + streak;
+  float d1A,d2A,d1B,d2B; vec2 cidA,cidB,rA,rB;
+  voronoiInfo(vpA,d1A,d2A,cidA,rA);
+  voronoiInfo(vpB,d1B,d2B,cidB,rB);
 
-  float developer = smoothstep(0.24,0.80, bathA*0.62 + bathB*0.38);
-  float dyeLoss   = smoothstep(0.28,0.84, bathB*0.64 + bathC*0.36);
-  float bleach    = smoothstep(0.52,0.96, bathA*0.30 + bathC*0.70);
-  float stain     = smoothstep(0.18,0.76, bathA*0.44 + bathB*0.18 + bathC*0.38);
+  float edgeA = sqrt(max(d2A-d1A,0.0));
+  float edgeB = sqrt(max(d2B-d1B,0.0));
+  float borderA = 1.0 - smoothstep(0.06, 0.18, edgeA);
+  float borderB = 1.0 - smoothstep(0.05, 0.14, edgeB);
+  float cellA = hash21(cidA + 9.7);
+  float cellB = hash21(cidB + 23.1);
+  float grainA = smoothstep(0.18,0.82,cellA);
+  float grainB = smoothstep(0.12,0.88,cellB);
 
-  vec3 rS = texM(uv + drift*vec2(1.0,0.8));
-  vec3 gS = texM(uv - drift*vec2(0.7,1.0));
-  vec3 bS = texM(uv + drift.yx*vec2(0.8,-0.6));
-  vec3 layer = vec3(rS.r, gS.g, bS.b);
-  vec3 cross = vec3(layer.g*0.82 + layer.r*0.20,
-                    layer.b*0.74 + layer.g*0.26,
-                    layer.r*0.78 + layer.b*0.18);
+  float bathA = fbm6(rot2(p,(uR1.x-0.5)*0.8)*2.4 + vec2(uSeed*0.013,17.0));
+  float bathB = fbm4(rot2(p,0.93)*5.2 + vec2(31.0,uSeed*0.019));
+  float wash = fbm4(p*3.7 + vec2(uSeed*0.021,57.0));
+  float chemistry = smoothstep(0.24,0.86,0.48*bathA + 0.27*bathB + 0.25*wash);
 
-  vec3 spectral = mix(triPalette(bathA*0.58 + uR1.x), mix(uC0,uC2,0.52), 0.34);
-  vec3 outc = mix(base, cross, developer*(0.20 + 0.30*amt));
-  outc = mix(outc, spectral*(0.74 + 0.30*lum(layer)), dyeLoss*(0.10 + 0.22*ch));
-  outc = mix(outc, vec3(0.99,0.97,0.92), bleach*(0.05 + 0.16*amt)*(1.0-lum(base)*0.28));
+  // Facets are now smaller and layered, so they read as crystalline emulsion,
+  // not a few large coarse polygons.
+  float mosaic = grainA*(0.42+0.45*amt) + grainB*(0.16+0.30*ch);
+  float seam = borderA*(0.18+0.32*amt) + borderB*(0.08+0.18*ch);
+  float crystal = sat(mosaic*0.74 + chemistry*0.42);
 
-  // Developer surge / staining currents.
-  vec3 stainTint = mix(uC0,uC1,0.38 + 0.34*bathB);
-  outc = mix(outc, outc * mix(vec3(1.0), stainTint, 0.26), stain*(0.22+0.26*amt));
+  vec2 drift = normalize(rA + 0.6*rB + vec2(0.001)) * (0.004 + 0.020*crystal);
+  vec3 samp1 = texM(uv + drift*vec2(1.0,0.8));
+  vec3 samp2 = texM(uv - drift*vec2(0.8,1.0));
+  vec3 layer = vec3(samp1.r, samp2.g, mix(samp1.b,samp2.b,0.5));
 
-  // Residue and silver response as continuous edges/noise, not facets.
-  float residue = smoothstep(0.54,0.90, bathC + bathB*0.20);
-  outc = screenBlend(outc, mix(uC1,vec3(1.0,0.96,0.88),0.40) * residue * (0.05+0.10*amt));
-  outc = mix(outc, hsvShiftLike(outc,bathB*0.20 + uR1.z*0.24), 0.08 + 0.14*amt);
+  vec3 dye1 = mix(uC0, uC1, grainA);
+  vec3 dye2 = mix(uC2, uC0, grainB);
+  vec3 chemTint = mix(dye1, dye2, 0.38 + 0.26*bathB);
+  chemTint = mix(chemTint, triPalette(cellA*0.4 + bathA*0.5 + uR2.x*0.4), 0.18);
 
-  float sediment = pow(hash21(floor(uv*uResolution*0.18)+uSeed*11.0), 16.0) * stain * 0.08 * amt;
-  outc = mix(outc, vec3(0.96,0.93,0.86), sediment);
-  outc += vec3((hash21(floor(uv*uResolution)+uSeed*31.0)-0.5) * (0.006 + 0.009*amt));
+  vec3 outc = mix(base, layer, crystal*(0.18+0.26*amt));
+  outc = mix(outc, outc*mix(vec3(1.0), chemTint, 0.73), crystal*(0.32+0.38*amt));
 
-  outc = preserveSource(base,outc);
-  vec3 tone = paletteWash(outc, mix(uC0,vec3(0.92,0.82,0.74),0.30), mix(uC1,uC2,0.46), vec3(1.0,0.99,0.96), 0.28+0.24*amt);
-  tone = splitTone(tone, mix(uC0,uC2,0.48), mix(uC1,vec3(1.0),0.40), 0.14+0.18*ch);
-  tone = hueRotate(tone,(uR0.x-0.5)*0.20 + (bathB-0.5)*0.08);
-  tone = contrastSat(tone,0.06+0.10*amt,1.08+0.14*amt);
-  outc = mix(outc,tone,0.40+0.20*amt);
+  // Effective polygon seams: not huge blocks, but a web of developer edges.
+  vec3 seamTint = mix(mix(uC1, vec3(1.0,0.96,0.88), 0.44), chemTint, 0.30);
+  outc = screenBlend(outc, seamTint * seam * (0.10 + 0.16*amt));
+
+  // Local bleaching and dye residues collect around cell borders and a few cells.
+  float bleach = seam*(0.28+0.42*chemistry) + borderB*grainB*0.16;
+  outc = mix(outc, vec3(0.98,0.97,0.92), bleach*(0.05+0.14*amt)*(1.0-lum(base)*0.32));
+  float residue = crystal*(0.12+0.18*ch)*(0.55+0.45*grainA);
+  outc = mix(outc, hsvShiftLike(outc, cellB*0.25 + bathB*0.17), residue);
+
+  // Smaller sparkling sediment to enrich the chemical feel.
+  float speck = pow(hash21(floor(uv*uResolution*0.26)+uSeed*15.0), 20.0) * (0.18+0.42*chemistry) * amt;
+  outc = mix(outc, vec3(0.98,0.95,0.86), speck*0.12);
+  outc += vec3((hash21(floor(uv*uResolution)+uSeed*37.0)-0.5) * (0.006 + 0.010*amt));
+
+  outc = preserveSource(base, outc);
+  vec3 tone = paletteWash(outc, mix(uC0,vec3(0.90,0.84,0.76),0.24), mix(uC1,uC2,0.46), vec3(1.0,0.99,0.96), 0.26+0.30*amt);
+  tone = splitTone(tone, mix(uC0,uC2,0.52), mix(uC1,vec3(1.0),0.35), 0.16+0.22*ch);
+  tone = hueRotate(tone, (uR1.z-0.5)*0.20 + (bathB-0.5)*0.12);
+  tone = contrastSat(tone, 0.06+0.10*amt, 1.08+0.16*amt);
+  outc = mix(outc, tone, 0.40+0.24*amt);
   outc = softShoulder(outc);
-  gl_FragColor=vec4(clamp(outc,0.0,1.0),1.0);
+  gl_FragColor = vec4(clamp(outc,0.0,1.0),1.0);
 }`;
 const PALETTES = [
   {name:'EMBER FILM', c0:[0.95,0.58,0.32], c1:[1.00,0.85,0.55], c2:[0.98,0.48,0.66]},
@@ -134,7 +167,7 @@ const PALETTES = [
   {name:'CYAN DUST', c0:[0.48,0.76,0.92], c1:[0.78,0.84,1.00], c2:[0.96,0.76,0.98]},
   {name:'PALE SILVER', c0:[0.72,0.76,0.80], c1:[0.90,0.92,0.95], c2:[0.99,0.97,0.94]}
 ];
-const FAMILIES = ['DEVELOPER CURRENT','DYE WASH','BLEACH CLOUD','SILVER RESIDUE','BATH STREAK'];
+const FAMILIES = ['CRYSTAL BLEACH','EMULSION CELLS','CHEMICAL FACETS','DEVELOPER MESH','SILVER GRAIN'];
 function makeRecipe(){
  const r=Math.random;
  const p=PALETTES[Math.floor(r()*PALETTES.length)];
