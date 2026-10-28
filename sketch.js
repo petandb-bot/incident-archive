@@ -3,7 +3,7 @@
 window.IA_SCRIPT_LOADED = true;
 
 const APP = {
-  version: '0.2.9.8',
+  version: '0.3.0',
   mode: 'SOLAR',
   // Per-mode state. Switching modes never mutates another engine's recipe/settings.
   params: { amount: 88, chance: 80, preserve: 22 },
@@ -120,48 +120,47 @@ void main(){
   vec2 p=uv-0.5;
   vec3 base=texM(uv);
   float amt=uAmount, ch=uChance;
-  float guard = subjectGuard(uv, base);
 
-  float n0=fbm6(rot2(p,(uR0.x-0.5)*1.9)*2.2 + vec2(uSeed*0.013,12.0));
-  float n1=fbm4(rot2(p,(uR0.y-0.5)*2.4)*5.2 + vec2(22.0,uSeed*0.017));
-  float e=edge(uv,1.4/uResolution.x);
   float y=lum(base);
+  float n0=fbm6(rot2(p,(uR0.x-0.5)*1.4)*2.0 + vec2(uSeed*0.013,12.0));
+  float n1=fbm4(rot2(p,(uR0.y-0.5)*2.0)*4.7 + vec2(22.0,uSeed*0.017));
+  float cloud=fbm4(p*3.1 + vec2(uSeed*0.021,55.0));
+  float e=edge(uv,1.2/max(min(uResolution.x,uResolution.y),1.0));
 
-  float threshold = mix(0.39,0.73,uR0.z) + (n0-0.5)*(0.08+0.14*ch);
-  float reverseBand = smoothstep(threshold-0.08-0.08*amt, threshold+0.05, y + (n1-0.5)*0.10);
+  // Tonal reversal with continuous threshold drift, like a sabattier print.
+  float threshold = mix(0.36,0.74,uR0.z) + (n0-0.5)*(0.06+0.12*ch) + (cloud-0.5)*0.05;
+  float rev = smoothstep(threshold-(0.10+0.08*amt), threshold+(0.02+0.04*ch), y + (n1-0.5)*0.08);
   vec3 inv = vec3(1.0)-base;
-  vec3 sabattier = mix(base, inv, reverseBand*(0.46+0.28*amt)*(1.0-0.22*guard));
+  vec3 outc = mix(base, inv, rev*(0.34+0.34*amt));
 
-  float edgeRim = smoothstep(0.05,0.33,e + reverseBand*0.22);
-  vec3 rimTint = mix(triPalette(uR1.x + y*0.6), mix(uC0,uC1,0.5), 0.50);
-  sabattier = mix(sabattier, vec3(1.0), edgeRim*(0.10+0.32*amt)*(0.45+0.45*ch)*(1.0-0.25*guard));
-  sabattier = screenBlend(sabattier, rimTint * edgeRim * (0.10+0.18*amt));
+  // Metallic rim and silver bloom around edges and bright zones.
+  float rim = smoothstep(0.04,0.30, e + rev*0.14 + (n0-0.5)*0.04);
+  vec3 rimTint = mix(mix(uC0,uC1,0.52), vec3(1.0,0.985,0.95), 0.34);
+  outc = screenBlend(outc, rimTint * rim * (0.12+0.18*amt));
 
-  float rayGate = smoothstep(0.90,0.98,uR2.w);
-  float ang0=mix(-1.2,1.2,uR1.y);
-  float ray0=lineGlow(p,ang0,mix(-0.16,0.16,uH0.x),mix(0.022,0.065,uH0.y));
-  float rayTexture=smoothstep(0.54,0.92,n0+0.16*n1+0.04);
-  float rayField=ray0*rayTexture*rayGate*(1.0-0.16*guard);
-  vec3 rayTint=mix(mix(uC1,vec3(1.0,0.985,0.95),0.68),triPalette(uR2.x+n1*0.26),0.18);
-  sabattier=screenBlend(sabattier,rayTint*rayField*(0.10+0.18*amt));
+  float highlight = smoothstep(0.58,0.98, y + n0*0.08 + cloud*0.06);
+  vec3 bloomTint = mix(uC2, vec3(1.0), 0.76);
+  outc = screenBlend(outc, bloomTint * highlight * (0.08+0.16*amt));
 
-  float localBloom=smoothstep(0.66,0.98,y+n0*0.15)*smoothstep(0.46,0.88,n1+n0*0.22);
-  sabattier=screenBlend(sabattier,mix(vec3(1.0),uC2,0.08)*localBloom*(0.06+0.14*amt));
+  // Diffuse veil rather than geometric flare.
+  float veil = smoothstep(0.18,0.88, n0*0.66 + n1*0.34);
+  outc = mix(outc, outc * mix(vec3(1.0), mix(uC1,uC2,0.5), 0.20), veil*(0.08+0.16*ch));
 
-  float clipLift=reverseBand*(0.10+0.30*amt)*(0.56+0.30*ch)+rayField*(0.020+0.050*amt)+localBloom*(0.022+0.05*amt);
-  sabattier=mix(sabattier,vec3(1.0),clipLift*(1.0-y*0.38));
-  sabattier=mix(sabattier,hsvShiftLike(sabattier,uR2.y*0.42+n0*0.08),0.14+0.14*ch);
+  // White clipping where reversal and highlights collide.
+  float clip = rev*highlight*(0.12+0.24*amt) + rim*0.05*amt;
+  outc = mix(outc, vec3(1.0), clip*(1.0-y*0.32));
 
-  float grain=(hash21(floor(uv*uResolution)+uSeed*19.0)-0.5)*(0.008+0.008*amt);
-  sabattier+=vec3(grain);
-  sabattier=preserveSource(base,sabattier);
-  vec3 solarTone = splitTone(sabattier, mix(uC0,uC2,0.52), mix(uC1,vec3(1.0,0.985,0.96),0.50), 0.22+0.26*amt);
-  solarTone = paletteWash(solarTone, uC0, mix(uC1,vec3(1.0),0.30), uC2, 0.22+0.24*ch);
-  solarTone = hueRotate(solarTone, (uR2.y-0.5)*0.22 + (n0-0.5)*0.08);
-  solarTone = contrastSat(solarTone, 0.06+0.10*amt, 1.10+0.10*amt);
-  sabattier = mix(sabattier, solarTone, 0.36+0.20*amt);
-  sabattier=softShoulder(sabattier);
-  gl_FragColor=vec4(clamp(sabattier,0.0,1.0),1.0);
+  outc = mix(outc, hsvShiftLike(outc,uR2.y*0.34 + (n0-0.5)*0.08), 0.10+0.12*ch);
+  outc += vec3((hash21(floor(uv*uResolution)+uSeed*19.0)-0.5) * (0.006+0.007*amt));
+  outc = preserveSource(base,outc);
+
+  vec3 solarTone = splitTone(outc, mix(uC0,uC2,0.50), mix(uC1,vec3(1.0,0.985,0.96),0.44), 0.18+0.22*amt);
+  solarTone = paletteWash(solarTone, uC0, mix(uC1,vec3(1.0),0.28), uC2, 0.16+0.18*ch);
+  solarTone = hueRotate(solarTone, (uR2.y-0.5)*0.18 + (n0-0.5)*0.06);
+  solarTone = contrastSat(solarTone, 0.05+0.08*amt, 1.08+0.10*amt);
+  outc = mix(outc, solarTone, 0.34+0.18*amt);
+  outc = softShoulder(outc);
+  gl_FragColor=vec4(clamp(outc,0.0,1.0),1.0);
 }`;
 
 const REGISTER_FRAG = COMMON + `
@@ -170,47 +169,58 @@ void main(){
   vec2 p=uv-0.5;
   vec3 base=texM(uv);
   float amt=uAmount, ch=uChance;
-  float guard = subjectGuard(uv, base);
 
-  float z0=fbm4(rot2(p,(uH0.x-0.5)*2.4)*2.1+vec2(uSeed*0.013,9.0));
-  float z1=fbm4(rot2(p,(uH1.x-0.5)*3.0)*4.0+vec2(17.0,uSeed*0.016));
-  float zone=smoothstep(0.28,0.86, z0*0.8+z1*0.5 + length(p)*(0.2+0.2*uH0.y));
-  float e=edge(uv,1.8/uResolution.x);
+  // Analog transport instability: weave, directional drag, channel delay.
+  float gate = fbm4(vec2(uv.y*2.4, uSeed*0.017) + vec2(13.0,0.0));
+  float weave = fbm4(rot2(p,(uR0.x-0.5)*1.2)*3.2 + vec2(uSeed*0.013,9.0));
+  float ripple = fbm4(vec2(uv.y*8.0, uv.x*1.4) + vec2(17.0,uSeed*0.021));
+  float e=edge(uv,1.6/max(min(uResolution.x,uResolution.y),1.0));
 
   float a0=mix(-3.0,3.0,uR0.x);
-  float a1=a0+mix(0.28,1.4,uR0.y);
+  float a1=a0+mix(0.18,1.10,uR0.y);
   vec2 dir0=vec2(cos(a0),sin(a0));
   vec2 dir1=vec2(cos(a1),sin(a1));
-  float d0=mix(5.0,34.0,uR0.z)*(0.30+amt)*(1.0-0.22*guard);
-  float d1=mix(4.0,22.0,uR0.w)*(0.20+ch)*(1.0-0.22*guard);
   vec2 px=vec2(1.0)/uResolution;
 
-  vec3 rA=texM(uv+dir0*px*d0*(0.4+zone));
-  vec3 gA=texM(uv-dir1*px*d1*(0.6+zone*0.5));
-  vec3 bA=texM(uv+dir1*px*d1*(0.3+e));
-  vec3 mis=vec3(rA.r,gA.g,bA.b);
+  float d0 = mix(3.0,24.0,uR0.z)*(0.24+amt)*(0.76+0.24*gate);
+  float d1 = mix(2.0,18.0,uR0.w)*(0.18+ch)*(0.78+0.22*ripple);
+  vec2 offR = dir0*px*(d0*(0.65+0.40*weave)) + vec2(0.0,px.y*(ripple-0.5)*7.0*amt);
+  vec2 offG = -dir1*px*(d1*(0.55+0.35*gate)) + vec2(px.x*(weave-0.5)*5.0*ch,0.0);
+  vec2 offB = dir1*px*(d1*(0.45+0.50*ripple)) + vec2(-px.x*(gate-0.5)*4.0*amt, px.y*(weave-0.5)*4.0);
 
-  vec3 lumaLift = vec3(lum(texM(uv+dir0*px*d0*0.45)));
-  vec3 incident = mix(mis, mix(mis,lumaLift,0.45), e*(0.25+0.45*ch));
-  incident = mix(incident, hsvShiftLike(incident, uR1.x*0.5+z1*0.14), 0.10+0.18*amt);
+  vec3 mis = vec3(texM(uv+offR).r, texM(uv+offG).g, texM(uv+offB).b);
 
-  float slit = pow(ridge(0.5+0.5*sin(dot(rot2(p,a0),vec2(1.0,0.18))*mix(24.0,90.0,uR1.y)+z1*5.0)), 13.0);
-  incident = mix(incident, texM(uv+dir0*px*d0*0.75).bgr, slit*zone*(0.08+0.24*amt));
+  // Directional smear / print drag without hard cells.
+  vec2 dragDir = normalize(dir0 + dir1*0.35);
+  vec3 smear1 = texM(uv + dragDir*px*(4.0+16.0*weave)*(0.10+0.30*amt));
+  vec3 smear2 = texM(uv - dragDir*px*(3.0+12.0*gate)*(0.08+0.24*ch));
+  vec3 drag = mix(smear1, smear2, 0.42+0.18*ripple);
 
-  vec3 outc = mix(base, incident, zone*(0.56+0.34*amt));
-  outc = screenBlend(outc, triPalette(uR1.z+z0*0.3) * e * zone * (0.08+0.22*amt));
-  outc = mix(outc, vec3(1.0), e*zone*(0.06+0.14*amt));
-  outc += vec3((hash21(floor(uv*uResolution)+uSeed*23.0)-0.5) * (0.007+0.009*amt));
+  float band = smoothstep(0.22,0.82, gate*0.62 + ripple*0.38);
+  vec3 outc = mix(base, mis, 0.34 + 0.38*amt);
+  outc = mix(outc, drag, band*(0.12+0.24*amt));
+
+  // Registration marks become soft edge echoes, not polygons.
+  float echo = smoothstep(0.05,0.28,e) * (0.56+0.44*band);
+  vec3 echoTint = mix(mix(uC0,uC2,0.50), vec3(1.0), 0.18);
+  outc = screenBlend(outc, echoTint * echo * (0.08+0.18*amt));
+  outc = mix(outc, vec3(1.0), echo*(0.04+0.10*amt));
+
+  // Subtle slit-like instability as a tone disturbance, not a geometric cut.
+  float slit = smoothstep(0.60,0.98, sin(uv.y*mix(18.0,56.0,uR1.y) + weave*4.0 + gate*3.0)*0.5+0.5);
+  outc = mix(outc, hsvShiftLike(outc, uR1.x*0.36 + ripple*0.12), slit*(0.04+0.12*ch));
+
+  outc += vec3((hash21(floor(uv*uResolution)+uSeed*23.0)-0.5) * (0.006+0.008*amt));
   outc = preserveSource(base, outc);
-  vec3 regTone = splitTone(outc, mix(uC2,uC0,0.56), mix(uC1,vec3(1.0),0.34), 0.16+0.18*amt);
-  regTone = paletteWash(regTone, mix(uC0,uC2,0.40), uC1, vec3(1.0), 0.18+0.16*ch);
-  regTone = hueRotate(regTone, (z0-z1)*0.10 + (uR1.z-0.5)*0.18);
-  regTone = contrastSat(regTone, 0.05+0.10*amt, 1.06+0.12*amt);
-  outc = mix(outc, regTone, 0.34+0.18*amt);
+
+  vec3 regTone = splitTone(outc, mix(uC2,uC0,0.54), mix(uC1,vec3(1.0),0.30), 0.14+0.16*amt);
+  regTone = paletteWash(regTone, mix(uC0,uC2,0.36), uC1, vec3(1.0), 0.14+0.14*ch);
+  regTone = hueRotate(regTone, (weave-ripple)*0.08 + (uR1.z-0.5)*0.14);
+  regTone = contrastSat(regTone, 0.04+0.08*amt, 1.06+0.10*amt);
+  outc = mix(outc, regTone, 0.30+0.16*amt);
   outc = softShoulder(outc);
   gl_FragColor = vec4(clamp(outc,0.0,1.0),1.0);
 }`;
-
 
 const PALETTES = [
   {name:'EMBER FILM', c0:[0.95,0.58,0.32], c1:[1.00,0.85,0.55], c2:[0.98,0.48,0.66]},

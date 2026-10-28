@@ -1,21 +1,35 @@
-# INCIDENT ARCHIVE v0.2.9.8 — CHEMICAL / LEAK ENGINE SEPARATION
+# INCIDENT ARCHIVE v0.3.0 — LEAK以外のコンセプト再設計
 
-## Changes
-- `engines/chemical.js`: own GLSL utility source, fragment shader, palette, recipe generator, and uniform setter. The CHEMICAL visual algorithm is unchanged from v0.2.9.7.
-- `engines/leak.js`: independent GLSL utility source, fragment shader, 8 strong color palettes, mutation logic and uniform setter. The LEAK visual algorithm is unchanged from v0.2.9.7.
-- `sketch.js`: only dispatches to each engine. SOLAR and REGISTER retain the original shared renderer and shader source.
-- Mode-specific `modeRecipes` and `modeParams` preserve results and slider values independently. Switching away and back no longer automatically randomizes a mode; press MUTATE to change it.
-- The original photo remains the only shared texture source; neither engine uses the previous mode's output as input.
-- Save UI (DOWNLOAD PNG / SHARE / SAVE TO PHOTOS), high-resolution export and original aspect ratio are preserved.
+ベース：v0.2.9.9
 
-## Important diagnostic note
-The uploaded examples show translucent angular boundaries at nearly identical locations in both mode outputs. The reviewed CHEMICAL and LEAK shaders do not explicitly draw triangles; separation prevents cross-engine source changes but cannot guarantee removal of shapes already present in the source photograph or arising in the common WebGL renderer. If angles remain, compare an unmodified original photo and the app input, then investigate the shared WebGL draw path.
+## 方針
+LEAKは現状維持とし、SOLAR / CHEMICAL / REGISTER を「多角形に見えない別コンセプト」で再設計した。
 
-## Deployment
-Unzip into the GitHub Pages repository root. Overwrite `index.html`, `sketch.js`, `style.css`, `sw.js`, `manifest.webmanifest`, and ADD the NEW `engines/chemical.js` and `engines/leak.js` files (maintaining their directory). Keep the existing `icons/` folder. Check the header reads `0.2.9.8` after reload. When running as an iPhone home-screen app, close and restart; if cached files remain, remove and reinstall the home-screen shortcut.
+### SOLAR
+- コンセプト：**ソラリゼーション / サバティエ / 金属的ハレーション**
+- 連続した明度しきい値の反転、縁の銀化、明部の白いブルームを主体にした。
+- 幾何学的なポリゴン構造は使わない。
 
-## Tests
-- JS syntax check for all three JavaScript files.
-- CHEMICAL and LEAK shader sources byte-for-byte match v0.2.9.7 content when the dedicated GLSL utilities are prepended, so their appearance should not change in this structural release.
-- Cross-mode state isolation and randomization tested programmatically.
-- Safari iPhone real-device drawing/export not verified.
+### CHEMICAL
+- コンセプト：**現像液の流れ / 染料のにじみ / 漂白ムラ**
+- 多角形セルを廃止し、流体的なノイズ場で developer, dye loss, bleach を作る方式に戻した。
+- ポリゴンではなく、液体や薬品の染みのような変化を狙う。
+
+### REGISTER
+- コンセプト：**版ズレ / ゲートの揺れ / チャンネル遅延**
+- 方向性のあるRGBずれ、ドラッグ、やわらかいエッジエコーを主体にした。
+- 幾何学セルやファセットは使わない。
+
+### LEAK
+- v0.2.9.9 を維持。
+- 有機的な光漏れとハレーションの方向のまま。
+
+## 配置
+- ZIP内のファイルを既存ファイルに上書き。
+- `engines/` フォルダーごとアップロードが必要。
+- `icons/` は既存のものをそのまま使う。
+- 表示バージョンが `0.3.0` になっていることを確認。
+
+## 確認状況
+- JavaScript構文チェック通過。
+- WebGL実機確認は未実施。特にSOLAR / CHEMICAL / REGISTER の「多角形感の消失」は実機で要確認。
