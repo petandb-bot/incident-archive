@@ -3,7 +3,7 @@
 window.IA_SCRIPT_LOADED = true;
 
 const APP = {
-  version: '0.2.9.5',
+  version: '0.2.9.7',
   mode: 'SOLAR',
   params: { amount: 88, chance: 80, preserve: 22 },
   recipe: null,
@@ -278,72 +278,127 @@ void main(){
 
 
 const LEAK_FRAG = COMMON + `
-// 光漏れというより、フィルム乳剤そのものが染まったような広域の色変化。
-// 楕円形の塗りやスパッと切れる境界は作らず、元写真の輝度と局所階調を残す。
+// Variable-density optical leak / chromogenic film response.
+// A single edge-oriented light field drives three related responses:
+// dye saturation, selective loss of the latent image and photographic halation.
+// It is never composited as an opaque geometric shape.
+float leakFalloff(float d, float reach){
+  float x=max(d,0.0)/max(reach,0.10);
+  return exp(-1.12*pow(x,1.62));
+}
 void main(){
-  vec2 uv = screenUV();
-  vec2 p = uv - 0.5;
-  vec3 base = texM(uv);
-  float amt = uAmount;
-  float ch = uChance;
+  vec2 uv=screenUV();
+  vec2 p=uv-0.5;
+  vec3 base=texM(uv);
+  float amt=uAmount;
+  float chance=uChance;
+  float family=floor(uR2.w*5.0);
 
-  // 染料の流入方向を変えても、形は決め打ちのバンドにしない。
-  float family = floor(uR2.w * 5.0);
-  float depth = uv.y;
-  if(family < 1.0) depth = uv.y;
-  else if(family < 2.0) depth = 1.0 - uv.y;
-  else if(family < 3.0) depth = uv.x;
-  else if(family < 4.0) depth = 1.0 - uv.x;
-  else depth = 0.5 * uv.x + 0.5 * (1.0 - uv.y);
+  vec2 anchor, tangent, inward;
+  if(family<1.0){
+    anchor=vec2(mix(0.25,0.75,uH0.x),-0.07);
+    tangent=vec2(1.0,0.0);inward=vec2(0.0,1.0);
+  }else if(family<2.0){
+    anchor=vec2(mix(0.25,0.75,uH0.x),1.07);
+    tangent=vec2(1.0,0.0);inward=vec2(0.0,-1.0);
+  }else if(family<3.0){
+    anchor=vec2(-0.07,mix(0.25,0.75,uH0.x));
+    tangent=vec2(0.0,1.0);inward=vec2(1.0,0.0);
+  }else if(family<4.0){
+    anchor=vec2(1.07,mix(0.25,0.75,uH0.x));
+    tangent=vec2(0.0,1.0);inward=vec2(-1.0,0.0);
+  }else{
+    anchor=vec2(mix(0.12,0.55,uH0.x),-0.08);
+    tangent=normalize(vec2(0.91,0.42));
+    inward=normalize(vec2(-0.42,0.91));
+  }
 
-  // 低周波の連続した「乳剤の濃度」だけを用いる。
-  // 変化量はなめらかで、独立した円・多角形・水平帯を発生させない。
-  vec2 q = rot2(p,(uR0.x-0.5)*1.1);
-  float n0 = fbm4(q*1.65 + vec2(uSeed*0.019,17.0));
-  float n1 = fbm4(rot2(q,0.8)*3.1 + vec2(39.0,uSeed*0.023));
-  float n2 = noise2(q*5.2 + vec2(uSeed*0.037,71.0));
-  float density = 0.72 + 0.17*(0.5-depth)
-       + 0.32*(n0-0.5) + 0.13*(n1-0.5) + 0.045*(n2-0.5);
-  density = sat(density);
-  // 画像全体に色が入るが、濃度は場所と元画像の陰影に応じて変わる。
-  float stain = sat(density * (0.83+0.31*amt));
+  vec2 domain=rot2(p,(uR0.x-0.5)*0.80);
+  float broad=fbm4(domain*1.8+vec2(7.0,uSeed*0.017));
+  float medium=fbm4(rot2(p,0.8)*4.1+vec2(uSeed*0.031,26.2));
+  float fine=noise2(p*8.5+vec2(59.0,uSeed*0.053));
+  float pores=fbm4(p*6.4+vec2(uSeed*0.042,43.2));
+  vec2 rel=uv-anchor;
+  float depth=dot(rel,inward);
+  float sideways=dot(rel,tangent);
 
-  // MUTATEで選ばれるLEAK専用の高彩度パレット。
-  // 同じ染料でも暗部と明部で色が変わり、単色ベタ塗りに見えにくい。
-  float y = lum(base);
-  vec3 darkDye = uC0;
-  vec3 mainDye = uC1;
-  vec3 lightDye = uC2;
-  vec3 dye = mix(darkDye,mainDye,0.76+0.16*n1);
-  dye = mix(dye,lightDye,0.03+0.09*smoothstep(0.45,0.93,y));
+  // Disturb the reach over wide distances, not by drawing wobbly polygons.
+  float travel=depth+(broad-0.54)*(0.26+0.17*chance)
+                    +(medium-0.51)*(0.07+0.10*chance);
+  float reach=mix(0.52,0.88,uH0.y);
+  float exposure=leakFalloff(travel,reach);
+  float across=sideways+(medium-0.5)*0.16;
+  exposure*=1.0-0.21*smoothstep(0.45,1.10,abs(across));
+  exposure*=0.81+0.27*broad+0.19*medium;
+  // Inhomogeneous density and two weak irregular emulsion blooms.
+  float cloud=0.18+0.82*smoothstep(0.23,0.76,pores);
+  exposure*=mix(0.81,1.15,cloud);
+  exposure=clamp(exposure*(0.88+0.63*amt),0.0,1.55);
 
-  // 元写真の明暗を色の強度として使用する光学染色モデル。
-  // 一定色で塗るmix(base, dye, mask)とは異なり枝・葉・人物等の陰影が残る。
-  float emulsionLight = 0.40 + 0.80*pow(max(y,0.012),0.76);
-  emulsionLight *= 0.92+0.13*n0;
-  vec3 transmitted = base * (vec3(0.13)+0.16*(vec3(1.0)-dye));
-  vec3 dyedImage = dye*emulsionLight + transmitted;
-  vec3 outc = mix(base,dyedImage,stain*(0.88+0.10*amt));
+  // Separate spatially related phases: dense filter near the source,
+  // revealed photograph in the middle, and pale exposed highlights.
+  float density=smoothstep(0.12,1.07,exposure);
+  float saturation=smoothstep(0.05,0.70,exposure);
+  float localLuma=lum(base);
+  // Local halos respect photographic brightness, rather than overlaying a disc.
+  vec2 d=vec2(0.010,0.015);
+  float softScene=(lum(texM(uv+vec2(d.x,0.0)))+
+                   lum(texM(uv-vec2(d.x,0.0)))+
+                   lum(texM(uv+vec2(0.0,d.y)))+
+                   lum(texM(uv-vec2(0.0,d.y))))*0.25;
+  float luminous=smoothstep(0.18,0.89,0.61*localLuma+0.39*softScene);
+  float edgeOfBurn=smoothstep(0.14,0.43,exposure)*
+                   (1.0-smoothstep(0.73,1.21,exposure));
+  float wet=0.73+0.28*broad+0.20*medium;
 
-  // 汚染されたハイライトは写真中の明るい部分に追従する。
-  // 独立した円形スポットや直線ビームは生成しない。
-  vec2 stepUV=vec2(0.014,0.018);
-  float around = (lum(texM(uv+stepUV))+lum(texM(uv-stepUV))
-                 +lum(texM(uv+vec2(-stepUV.x,stepUV.y)))
-                 +lum(texM(uv+vec2(stepUV.x,-stepUV.y))))*0.25;
-  float luminous = mix(y,around,0.40);
-  float highlight = smoothstep(0.47,0.91,luminous+0.07*(n1-0.5));
-  highlight *= stain*(0.19+0.31*ch);
-  vec3 halation = mix(lightDye,vec3(1.0),0.23);
-  outc=mix(outc,halation,highlight);
+  // Dyes selected by MUTATE: one family per exposure, no shared pastel palette.
+  vec3 dye=mix(uC0,uC1,0.44+0.47*density);
+  dye=mix(dye,uC2,0.06+0.11*fine);
+  // Dense film stain is strongly chromatic, not a pale RGB overlay.
+  // Spatially modulated scene luminance preserves photographic structure.
+  vec3 dyed=dye*(0.22+0.47*density+0.31*localLuma)
+             +base*(0.045+0.12*(1.0-density));
+  float deposit=saturation*(0.56+0.44*amt)*wet;
+  vec3 outc=mix(base,dyed,clamp(deposit,0.0,0.97));
 
-  // 画面全体に弱い色の回り込みを入れ、染色領域だけが浮くことを防ぐ。
-  outc=screenBlend(outc, mainDye*(0.025+0.07*amt));
-  float grain=(hash21(floor(uv*uResolution)+uSeed*37.0)-0.5)
-              *(0.004+0.008*amt);
+  // At the edge of exposure, emulsion clears and bright objects bloom.
+  // Photo-linked white breakouts keep the scene legible while visible light
+  // spreads irregularly across it, not as a single flat saturated block.
+  float lift=edgeOfBurn*(0.14+0.43*luminous)
+             *(0.31+0.46*amt)*(0.65+0.35*chance);
+  vec3 pale=mix(uC2,vec3(1.0),0.74+0.20*luminous);
+  outc=mix(outc,pale,clamp(lift,0.0,0.70));
+
+  // Broad overexposure that breaks through the dye. Its position follows
+  // the same incoming light direction, with nonperiodic density drift.
+  float center=mix(0.29,0.67,uH1.x);
+  float width=mix(0.17,0.32,uH1.y);
+  float drift=(broad-0.52)*0.23+(medium-0.50)*0.095;
+  float bloomCross=exp(-pow(abs(depth-center+drift)/width,2.0));
+  float flareSide=uR1.z>0.5 ? sideways : -sideways;
+  float asymmetry=smoothstep(-0.46,0.81,flareSide+(medium-0.5)*0.21);
+  float whiteBreak=bloomCross*smoothstep(0.17,0.56,exposure)
+                  *(0.32+0.55*amt)*(0.47+0.53*luminous)
+                  *(0.75+0.25*medium)*mix(0.66,1.48,asymmetry);
+  outc=mix(outc,mix(pale,vec3(1.0),0.78),
+           clamp(whiteBreak,0.0,0.85));
+
+  float hotHighlights=smoothstep(0.45,0.91,
+                          0.60*localLuma+0.40*softScene);
+  float bloom=saturation*hotHighlights*(0.035+0.12*amt)*
+              (0.64+0.36*medium);
+  outc=screenBlend(outc,pale*bloom);
+
+  // Patches of dye fade continuously into the original latent image.
+  float recovery=(1.0-density)*smoothstep(0.31,0.72,medium)
+                  *(0.12+0.19*chance);
+  outc=mix(outc,base,recovery);
+  float grain=(hash21(floor(uv*uResolution)+uSeed*37.0)-0.5)*
+              (0.004+0.009*amt);
   outc+=vec3(grain);
+  outc=mix(base,outc,smoothstep(0.0,0.11,amt));
   outc=preserveSource(base,outc);
-  outc=softShoulder(outc);
+  outc=mix(outc,softShoulder(outc),0.28);
   gl_FragColor=vec4(clamp(outc,0.0,1.0),1.0);
 }`;
 

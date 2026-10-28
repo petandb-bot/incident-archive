@@ -1,24 +1,36 @@
-# INCIDENT ARCHIVE v0.2.9.5 — LEAK / SAVE修正版
+# INCIDENT ARCHIVE v0.2.9.7 — LEAK / optical exposure
 
-## LEAK
-- 色の強度は維持したまま、面積や輪郭がわかる図形・バンド型のマスクを廃止。
-- 低周波の連続濃度変化と、元写真の明暗を利用した染色に変更。ベタ塗りではなく画像の細部・階調が残る。
-- 白色露光を円形スポットで作らず、写真の明るい部分に追従するハレーションとして生成。
-- MUTATEのたびに赤、青、緑、紫、シアン、アンバー、マゼンタ、黄緑のLEAK専用色系統が変わる仕様を維持。
+## 目的
+ユーザー提示の比較：
+- 現状のシアン画像は、全体に均一な色がかかっただけで光の進入や強弱が見えない。
+- 理想の赤画像には、濃い染色、局所的な白い露光、像が見える領域と消える領域の関係がある。
 
-## SAVE（Safari / ブラウザ）
-- 従来の「PNG生成後にnavigator.shareを自動呼び出しする」処理を廃止。
-- SAVEでPNGを生成した後、DOWNLOAD PNG / SHARE / SAVE TO PHOTOSを表示する。
-- iPhone Safariで写真アプリへ保存する場合は、SHARE / SAVE TO PHOTOSをタップ→iOS共有シートの「画像を保存」を選択する。DOWNLOAD PNGはファイルとして保存する。
-- Mac/Windowsのブラウザは自動ダウンロードを試みるが、拒否された場合もDOWNLOAD PNGから直接保存できる。
-- WebGL描画後、await前に2Dキャンバスへ確実に固定してPNG化する処理を維持。
-- MUTATE / パラメータ変更 / BACK / モード変更 / 画像変更 / 出力サイズ変更時、前のPNGリンクを消去。
+## 変更内容（LEAKのみ）
+- **単一の光量分布**から、染料の定着・白い露光・画像の復帰・ハレーションを連動して計算。
+- 四辺と斜めからの光の進入をMUTATEで選択。低周波の揺らぎを加え、直線の切断面・図形マスク・細い光線を使わない。
+- 色は高彩度の8系統（深紅、コバルト、ビリジアン、紫、シアン、アンバー、マゼンタ、黄緑）。MUTATEで直前と同じ色が連続しない。
+- 強い色の領域は現像画像の明暗を残し、露光側は写真の明暗を参照して乳白色に抜ける。方向に沿って白い露光の強弱も変わる。
+- AMOUNT は影響の強さ、CHANCE は不規則性と露光変動、PRESERVE は元写真の色を戻す割合を引き続き反映する。
 
-## 変更しない箇所
-SOLAR、CHEMICAL、REGISTER、既存画面構成、MUTATE、EDIT、BACK、元写真比率、出力解像度（1800/2600/3200）、p5.js 1.11.13。
+## 変更していないもの
+- SOLAR / CHEMICAL / REGISTER のシェーダー
+- GUI、MUTATE / EDIT / BACK、画像の縦横比、1800 / 2600 / 3200 pxの書き出し、p5.js 1.11.13
+- v0.2.9.5で導入した画像生成後の **DOWNLOAD PNG / SHARE / SAVE TO PHOTOS**
+- WebGL描画直後に2D Canvasへ転写してからPNG化するエクスポート方式
 
-## 配置
-ZIP内のindex.html、style.css、sketch.js、sw.js、manifest.webmanifestをGitHub Pagesのリポジトリ直下へ上書き。元からあるicons/は残してください。ヘッダーの版数が0.2.9.5であることを確認。Safariで古い版が出る場合は再読込、ホーム画面PWAなら再起動してください。
+## 配置方法
+1. ZIP内の `index.html`, `style.css`, `sketch.js`, `sw.js`, `manifest.webmanifest` をGitHub Pagesリポジトリ直下の同名ファイルに上書き。
+2. 既存の `icons/` フォルダーは削除しない（このZIPには含まない）。
+3. 公開後、アプリのヘッダーが **0.2.9.7** になっていることを確認。
+4. iPhoneのホーム画面PWAで古い内容が表示されるときは、アプリを終了して開き直す。必要ならSafariから再追加。
 
-## 検証
-JavaScript構文検査、Chromiumを用いたPNG生成からダウンロードリンク操作までの模擬動作確認を実施。実機iPhone Safariおよび実際のWebGLシェーダー描画は未検証。
+## 画像保存
+- SAVEをタップするとPNGを生成。生成後の「DOWNLOAD PNG」からダウンロードできる。
+- iPhoneで写真アプリへ直接保存する場合は「SHARE / SAVE TO PHOTOS」→ iOS共有シート「画像を保存」。
+- Windows/Macでは自動ダウンロードを試みるが、止められても表示された「DOWNLOAD PNG」から保存可能。
+
+## 検査結果
+- `node --check`：通過。
+- 独立したChromium+WebGLソフトウェアレンダリング（Mesa/Xvfb）でLEAKシェーダーのコンパイル・8パレットの実描画を確認。
+- 参考のシアン処理済み都市画像を入力に使用。実際の無加工写真やiPhone Safariでの結果は未検証。
+- その他3シェーダーと保存フローは今回変更せず、iPhone実機でのPNG書き出しは未検証。
