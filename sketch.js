@@ -3,7 +3,7 @@
 window.IA_SCRIPT_LOADED = true;
 
 const APP = {
-  version: '0.3.4',
+  version: '0.3.5',
   mode: 'SOLAR',
   // Per-mode state. Switching modes never mutates another engine's recipe/settings.
   params: { amount: 88, chance: 80, preserve: 22 },
