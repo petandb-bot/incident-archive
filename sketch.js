@@ -3,7 +3,7 @@
 window.IA_SCRIPT_LOADED = true;
 
 const APP = {
-  version: '0.2.9.4',
+  version: '0.2.9.5',
   mode: 'SOLAR',
   params: { amount: 88, chance: 80, preserve: 22 },
   recipe: null,
@@ -12,10 +12,11 @@ const APP = {
   sourceName: '',
   shaders: {},
   ready: false,
-  busy: false
+  busy: false,
+  preparedExport: null
 };
 
-const IDS = ['openPhotoTop','openPhotoPrimary','photoInput','canvasMount','emptyState','mutateButton','backButton','editToggle','editChevron','editPanel','saveButton','amountSlider','amountValue','chanceSlider','chanceValue','preserveSlider','preserveValue','exportSize','renderOverlay','renderLabel','statusText','variationMeta','errorPanel','errorDetail'];
+const IDS = ['openPhotoTop','openPhotoPrimary','photoInput','canvasMount','emptyState','mutateButton','backButton','editToggle','editChevron','editPanel','saveButton','amountSlider','amountValue','chanceSlider','chanceValue','preserveSlider','preserveValue','exportSize','renderOverlay','renderLabel','exportReady','readyDownload','readyShare','readyStatus','statusText','variationMeta','errorPanel','errorDetail'];
 
 const VERT = `
 precision highp float;
@@ -277,96 +278,69 @@ void main(){
 
 
 const LEAK_FRAG = COMMON + `
-// Film-dye flood. Strong, saturated color coverage, with a soft boundary
-// and one wide optical bleaching area. Intensity is independent of hue.
-// No rays, polygon clipping, straight hard seams, or small hot spots.
-float leakGaussian(vec2 d, vec2 spread){
-  vec2 q=d / max(spread,vec2(0.001));
-  return exp(-dot(q,q)*1.45);
-}
+// 光漏れというより、フィルム乳剤そのものが染まったような広域の色変化。
+// 楕円形の塗りやスパッと切れる境界は作らず、元写真の輝度と局所階調を残す。
 void main(){
-  vec2 uv=screenUV();
-  vec2 p=uv-0.5;
-  vec3 base=texM(uv);
-  float amt=uAmount;
-  float ch=uChance;
-  float family=floor(uR2.w*5.0);
+  vec2 uv = screenUV();
+  vec2 p = uv - 0.5;
+  vec3 base = texM(uv);
+  float amt = uAmount;
+  float ch = uChance;
 
-  // Use the same spatial concept regardless of the chosen dye color.
-  // depth measures distance from the selected image edge.
-  float depth;
-  float across;
-  if(family<1.0){
-    depth=uv.y; across=uv.x;
-  }else if(family<2.0){
-    depth=1.0-uv.y; across=uv.x;
-  }else if(family<3.0){
-    depth=uv.x; across=uv.y;
-  }else if(family<4.0){
-    depth=1.0-uv.x; across=uv.y;
-  }else{
-    depth=uv.y; across=uv.x;
-  }
+  // 染料の流入方向を変えても、形は決め打ちのバンドにしない。
+  float family = floor(uR2.w * 5.0);
+  float depth = uv.y;
+  if(family < 1.0) depth = uv.y;
+  else if(family < 2.0) depth = 1.0 - uv.y;
+  else if(family < 3.0) depth = uv.x;
+  else if(family < 4.0) depth = 1.0 - uv.x;
+  else depth = 0.5 * uv.x + 0.5 * (1.0 - uv.y);
 
-  float n0=fbm4(p*2.0+vec2(uSeed*0.013,17.0));
-  float n1=fbm4(rot2(p,0.9)*3.5+vec2(39.0,uSeed*0.017));
-  float n2=fbm4(rot2(p,-0.6)*1.7+vec2(uSeed*0.021,83.0));
+  // 低周波の連続した「乳剤の濃度」だけを用いる。
+  // 変化量はなめらかで、独立した円・多角形・水平帯を発生させない。
+  vec2 q = rot2(p,(uR0.x-0.5)*1.1);
+  float n0 = fbm4(q*1.65 + vec2(uSeed*0.019,17.0));
+  float n1 = fbm4(rot2(q,0.8)*3.1 + vec2(39.0,uSeed*0.023));
+  float n2 = noise2(q*5.2 + vec2(uSeed*0.037,71.0));
+  float density = 0.72 + 0.17*(0.5-depth)
+       + 0.32*(n0-0.5) + 0.13*(n1-0.5) + 0.045*(n2-0.5);
+  density = sat(density);
+  // 画像全体に色が入るが、濃度は場所と元画像の陰影に応じて変わる。
+  float stain = sat(density * (0.83+0.31*amt));
 
-  // Large color field: covers roughly 50-80% of the photograph on average.
-  // Low-frequency perturbation changes shape without any sharp transitions.
-  float boundary=0.53+0.23*uH0.y;
-  boundary+=(n0-0.5)*(0.12+0.06*ch)+(n2-0.5)*0.07;
-  float feather=0.068+0.085*uH1.x;
-  float flood=1.0-smoothstep(boundary-feather,boundary+feather,depth);
+  // MUTATEで選ばれるLEAK専用の高彩度パレット。
+  // 同じ染料でも暗部と明部で色が変わり、単色ベタ塗りに見えにくい。
+  float y = lum(base);
+  vec3 darkDye = uC0;
+  vec3 mainDye = uC1;
+  vec3 lightDye = uC2;
+  vec3 dye = mix(darkDye,mainDye,0.76+0.16*n1);
+  dye = mix(dye,lightDye,0.03+0.09*smoothstep(0.45,0.93,y));
 
-  if(family>=4.0){
-    // A second faint tide of dye, smoothly joined, not an intersecting cut.
-    float secondary=1.0-smoothstep(0.12,0.35,1.0-uv.y+(n1-0.5)*0.06);
-    flood=1.0-(1.0-flood)*(1.0-secondary*0.48);
-  }
+  // 元写真の明暗を色の強度として使用する光学染色モデル。
+  // 一定色で塗るmix(base, dye, mask)とは異なり枝・葉・人物等の陰影が残る。
+  float emulsionLight = 0.40 + 0.80*pow(max(y,0.012),0.76);
+  emulsionLight *= 0.92+0.13*n0;
+  vec3 transmitted = base * (vec3(0.13)+0.16*(vec3(1.0)-dye));
+  vec3 dyedImage = dye*emulsionLight + transmitted;
+  vec3 outc = mix(base,dyedImage,stain*(0.88+0.10*amt));
 
-  // Broad emulsion bloom close to the boundary. Avoid pinpoint light cores.
-  float x0=0.22+0.56*uH1.y;
-  float bloomX=(across-x0)+(n1-0.5)*0.045;
-  float bloomY=depth-(boundary+0.025);
-  float bloom=leakGaussian(vec2(bloomX,bloomY),
-                           vec2(0.31+0.20*uH2.x,0.14+0.13*uH2.y));
-  float haze=leakGaussian(vec2(bloomX,bloomY),vec2(0.62,0.33));
-  float wash=sat(flood+haze*(0.10+0.13*amt));
+  // 汚染されたハイライトは写真中の明るい部分に追従する。
+  // 独立した円形スポットや直線ビームは生成しない。
+  vec2 stepUV=vec2(0.014,0.018);
+  float around = (lum(texM(uv+stepUV))+lum(texM(uv-stepUV))
+                 +lum(texM(uv+vec2(-stepUV.x,stepUV.y)))
+                 +lum(texM(uv+vec2(stepUV.x,-stepUV.y))))*0.25;
+  float luminous = mix(y,around,0.40);
+  float highlight = smoothstep(0.47,0.91,luminous+0.07*(n1-0.5));
+  highlight *= stain*(0.19+0.31*ch);
+  vec3 halation = mix(lightDye,vec3(1.0),0.23);
+  outc=mix(outc,halation,highlight);
 
-  // uC0 is deep dye, uC1 the saturated body, uC2 the luminous emulsion.
-  // These come from LEAK_PALETTES rather than the pastel palettes elsewhere.
-  vec3 deepDye=uC0;
-  vec3 mainDye=uC1;
-  vec3 lightDye=uC2;
-  vec3 dye=mix(deepDye,mainDye,0.52+0.24*n0+0.10*n1);
-  dye=mix(dye,lightDye,0.09+0.15*n2);
-  dye=clamp(dye*(0.94+0.12*n1),0.0,1.0);
-
-  // Global color contamination is visible even beyond the flood.
-  // Inside the flood, a nearly opaque mass of pigment replaces the photo.
-  vec3 contaminated=base*mix(vec3(1.0),mainDye,0.43*amt);
-  contaminated=mix(contaminated,mainDye,0.09+0.14*amt);
-  float coverage=wash*(0.84+0.15*amt);
-  vec3 outc=mix(contaminated,dye,coverage);
-
-  // Underlying photograph survives at the boundary and optical opening.
-  // It appears through dyed exposure rather than a geometric cut-out.
-  float reveal=bloom*(0.12+0.19*ch)*(1.0-0.20*flood);
-  vec3 exposedPhoto=mix(base,base*lightDye,0.28);
-  outc=mix(outc,exposedPhoto,reveal);
-
-  // One broad overexposed area as in the original saturated red reference.
-  // The highlight remains smooth and tied to the pigment's own light tone.
-  vec3 paper=mix(lightDye,vec3(1.0),0.52);
-  float bleach=bloom*(0.41+0.32*amt);
-  bleach*=0.86+0.14*n2;
-  outc=mix(outc,paper,bleach);
-  outc=screenBlend(outc,lightDye*haze*(0.035+0.08*amt));
-
-  // Keep the source's detail in the uncovered region, and grain everywhere.
+  // 画面全体に弱い色の回り込みを入れ、染色領域だけが浮くことを防ぐ。
+  outc=screenBlend(outc, mainDye*(0.025+0.07*amt));
   float grain=(hash21(floor(uv*uResolution)+uSeed*37.0)-0.5)
-               *(0.005+0.008*amt);
+              *(0.004+0.008*amt);
   outc+=vec3(grain);
   outc=preserveSource(base,outc);
   outc=softShoulder(outc);
@@ -448,6 +422,8 @@ function wireUI(){
   ui.backButton.addEventListener('click',goBack);
   ui.editToggle.addEventListener('click',toggleEdit);
   ui.saveButton.addEventListener('click',saveHighRes);
+  ui.readyShare.addEventListener('click',sharePreparedImage);
+  ui.exportSize.addEventListener('change',discardPreparedExport);
   bindSlider(ui.amountSlider,ui.amountValue,'amount');
   bindSlider(ui.chanceSlider,ui.chanceValue,'chance');
   bindSlider(ui.preserveSlider,ui.preserveValue,'preserve');
@@ -641,6 +617,7 @@ function shaderSourceFor(mode){
 }
 
 function renderPreview(){
+  discardPreparedExport();
   if(!APP.ready||!APP.source) return;
   try{
     const sh=APP.shaders[APP.mode];
@@ -663,67 +640,107 @@ function setBusy(on,label='MUTATING'){
   ui.saveButton.disabled=on||!APP.source;
 }
 
+// 後から押せるダウンロードリンクを保持。変異・モード変更時は古い画像を破棄。
+function discardPreparedExport(){
+  if(!ui.exportReady) return;
+  if(APP.preparedExport && APP.preparedExport.url){
+    URL.revokeObjectURL(APP.preparedExport.url);
+  }
+  APP.preparedExport=null;
+  ui.exportReady.hidden=true;
+  ui.readyDownload.removeAttribute('href');
+  ui.readyDownload.removeAttribute('download');
+  ui.readyShare.hidden=true;
+}
+
+// 生成処理と保存操作を分ける。Safariのユーザー操作権限はawait後に失われやすい。
 async function saveHighRes(){
   if(!APP.source||APP.busy) return;
+  discardPreparedExport();
   setBusy(true,'RENDERING');
-  let g;
-  let capture;
+  let g=null;
+  let capture=null;
   try{
     const longSide=Number(ui.exportSize.value)||2600;
     const ratio=APP.source.width/APP.source.height;
     let outW,outH;
-    if(ratio>=1){ outW=longSide; outH=Math.max(2,Math.round(longSide/ratio)); }
-    else { outH=longSide; outW=Math.max(2,Math.round(longSide*ratio)); }
+    if(ratio>=1){outW=longSide;outH=Math.max(2,Math.round(longSide/ratio));}
+    else{outH=longSide;outW=Math.max(2,Math.round(longSide*ratio));}
+
     g=createGraphics(outW,outH,WEBGL);
     g.pixelDensity(1);
     g.noStroke();
-    const sh=g.createShader(VERT, shaderSourceFor(APP.mode));
+    const sh=g.createShader(VERT,shaderSourceFor(APP.mode));
     g.shader(sh);
     setUniforms(sh,outW,outH);
     g.clear();
     g.plane(outW,outH,1,1);
     g.resetShader();
 
-    // Safari may discard a WebGL drawing buffer after returning to the event
-    // loop. The old 80 ms timeout before toBlob could therefore capture
-    // incomplete triangles/tiles, including a sharp center seam. Copy to a
-    // normal 2D canvas synchronously, BEFORE the first await.
-    if(g.drawingContext && typeof g.drawingContext.finish==='function'){
-      g.drawingContext.finish();
-    }
+    // WebGLバッファの破棄を避けるため、イベントループに戻る前に2Dへコピー。
+    const gl=g.drawingContext;
+    if(gl && typeof gl.finish==='function') gl.finish();
     capture=document.createElement('canvas');
     capture.width=outW;
     capture.height=outH;
-    const captureCtx=capture.getContext('2d',{alpha:false});
-    if(!captureCtx) throw new Error('Cannot create the PNG capture canvas.');
-    captureCtx.drawImage(g.canvas,0,0,outW,outH);
-    g.remove();
-    g=null;
+    const ctx=capture.getContext('2d',{alpha:false});
+    if(!ctx) throw new Error('PNG capture canvas unavailable.');
+    ctx.drawImage(g.canvas,0,0,outW,outH);
+    g.remove();g=null;
+
     const blob=await canvasToBlob(capture,'image/png');
-    const base=(APP.sourceName||'incident-archive').replace(/\.[^.]+$/,'').replace(/[^a-z0-9_-]+/gi,'_');
-    const file=new File([blob],`${base}_${APP.mode.toLowerCase()}_${Date.now()}.png`,{type:'image/png'});
-    if(navigator.canShare&&navigator.canShare({files:[file]})){
-      await navigator.share({files:[file],title:'Incident Archive'});
-    }else{
-      const a=document.createElement('a');
-      const objectURL=URL.createObjectURL(blob);
-      a.href=objectURL;
-      a.download=file.name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(()=>URL.revokeObjectURL(objectURL),1200);
+    const baseName=(APP.sourceName||'incident-archive').replace(/\.[^.]+$/,'')
+      .replace(/[^a-z0-9_-]+/gi,'_');
+    const filename=`${baseName}_${APP.mode.toLowerCase()}_${Date.now()}.png`;
+    const url=URL.createObjectURL(blob);
+    // ダウンロードが拒否された場合もリンクを残す。共有時も生成後の直接タップが必要。
+    let file=null;
+    let canShareFiles=false;
+    try{
+      file=new File([blob],filename,{type:'image/png'});
+      canShareFiles=typeof navigator.share==='function' &&
+        typeof navigator.canShare==='function' && navigator.canShare({files:[file]});
+    }catch(_){ canShareFiles=false; }
+    APP.preparedExport={url,blob,file,filename};
+    ui.readyDownload.href=url;
+    ui.readyDownload.download=filename;
+    ui.readyShare.hidden=!canShareFiles;
+    ui.readyStatus.textContent=`PNG READY · ${outW} × ${outH}`;
+    ui.exportReady.hidden=false;
+
+    // PCブラウザは従来通り自動ダウンロードを試す。
+    // iPhone Safariは自動shareが失敗しやすいので、ユーザーが直接ボタンを押す。
+    if(!(/iPad|iPhone|iPod/i.test(navigator.userAgent) ||
+         (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1))){
+      ui.readyDownload.click();
     }
-  }catch(err){ showError(err); }
-  finally {
+  }catch(err){showError(err);}
+  finally{
     if(g) g.remove();
-    if(capture){ capture.width=0; capture.height=0; }
+    if(capture){capture.width=0;capture.height=0;}
     setBusy(false);
   }
 }
 
-function canvasToBlob(canvas, type){
-  return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Export failed.')),type));
+async function sharePreparedImage(){
+  const prepared=APP.preparedExport;
+  if(!prepared||!prepared.file||typeof navigator.share!=='function') return;
+  // navigator.share()を押下イベントの同期処理内で開始し、ジェスチャーを維持する。
+  try{
+    await navigator.share({files:[prepared.file],title:'Incident Archive'});
+  }catch(err){
+    // 共有メニューを閉じた場合はエラーとみなさない。ダウンロードリンクは維持。
+    if(err && err.name!=='AbortError') showError(err);
+  }
+}
+
+function canvasToBlob(canvas,type){
+  return new Promise((resolve,reject)=>{
+    if(typeof canvas.toBlob!=='function'){
+      reject(new Error('This browser cannot export PNG.'));return;
+    }
+    canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('Export failed.')),type);
+  });
 }
 
 function showError(err){

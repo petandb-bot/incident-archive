@@ -1,21 +1,24 @@
-# INCIDENT ARCHIVE v0.2.9.4 — LEAK strong color flood
+# INCIDENT ARCHIVE v0.2.9.5 — LEAK / SAVE修正版
 
-## LEAKを原点に戻した再設計
-- 添付の赤い作例のような、写真の広い部分を強い色で覆う染色処理に修正。
-- 前版の淡い透明色フィルターを廃止。画面の約半分以上を濃く染める大きな色面を基本にする。
-- LEAK専用に高彩度8系統（赤、コバルト、緑、紫、シアン、アンバー、マゼンタ、黄緑）を追加。MUTATEのたびに直前とは異なる色系統に切り替わる。
-- 白～淡色の広い露光と元写真の透けは維持。ただし不自然な尖った光線、強い直線境界、三角形状マスクは用いない。
-- AMOUNTは染色の強さ、CHANCEは露光・透けに反映。PRESERVEも維持。
+## LEAK
+- 色の強度は維持したまま、面積や輪郭がわかる図形・バンド型のマスクを廃止。
+- 低周波の連続濃度変化と、元写真の明暗を利用した染色に変更。ベタ塗りではなく画像の細部・階調が残る。
+- 白色露光を円形スポットで作らず、写真の明るい部分に追従するハレーションとして生成。
+- MUTATEのたびに赤、青、緑、紫、シアン、アンバー、マゼンタ、黄緑のLEAK専用色系統が変わる仕様を維持。
 
-## 変更対象
-- sketch.js のLEAKシェーダー、LEAK専用パレットとレシピの色選択のみ。
-- SOLAR/CHEMICAL/REGISTER、GUI、入力、履歴、PNG保存、画像比率、p5.js 1.11.13は変更なし。
-- index.html、sw.js、manifest.webmanifest のバージョンは0.2.9.4へ更新。
+## SAVE（Safari / ブラウザ）
+- 従来の「PNG生成後にnavigator.shareを自動呼び出しする」処理を廃止。
+- SAVEでPNGを生成した後、DOWNLOAD PNG / SHARE / SAVE TO PHOTOSを表示する。
+- iPhone Safariで写真アプリへ保存する場合は、SHARE / SAVE TO PHOTOSをタップ→iOS共有シートの「画像を保存」を選択する。DOWNLOAD PNGはファイルとして保存する。
+- Mac/Windowsのブラウザは自動ダウンロードを試みるが、拒否された場合もDOWNLOAD PNGから直接保存できる。
+- WebGL描画後、await前に2Dキャンバスへ確実に固定してPNG化する処理を維持。
+- MUTATE / パラメータ変更 / BACK / モード変更 / 画像変更 / 出力サイズ変更時、前のPNGリンクを消去。
 
-## GitHub Pages導入
-1. ZIP内のindex.html / style.css / sketch.js / sw.js / manifest.webmanifestをリポジトリ直下へ上書き。
-2. 既存のicons/フォルダーは削除しない（ZIPには含めない）。
-3. GitHub Pages公開後、Safariで開きバージョン0.2.9.4を確認。ホーム画面PWAが古い場合はアプリを閉じて再起動し、必要なら再追加。
+## 変更しない箇所
+SOLAR、CHEMICAL、REGISTER、既存画面構成、MUTATE、EDIT、BACK、元写真比率、出力解像度（1800/2600/3200）、p5.js 1.11.13。
 
-## 検証範囲
-JavaScript構文検証・ソース構成の検証を実施。iPhone Safari実機での表示・エクスポートは未検証。
+## 配置
+ZIP内のindex.html、style.css、sketch.js、sw.js、manifest.webmanifestをGitHub Pagesのリポジトリ直下へ上書き。元からあるicons/は残してください。ヘッダーの版数が0.2.9.5であることを確認。Safariで古い版が出る場合は再読込、ホーム画面PWAなら再起動してください。
+
+## 検証
+JavaScript構文検査、Chromiumを用いたPNG生成からダウンロードリンク操作までの模擬動作確認を実施。実機iPhone Safariおよび実際のWebGLシェーダー描画は未検証。
