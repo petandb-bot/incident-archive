@@ -1,36 +1,21 @@
-# INCIDENT ARCHIVE v0.2.9.7 — LEAK / optical exposure
+# INCIDENT ARCHIVE v0.2.9.8 — CHEMICAL / LEAK ENGINE SEPARATION
 
-## 目的
-ユーザー提示の比較：
-- 現状のシアン画像は、全体に均一な色がかかっただけで光の進入や強弱が見えない。
-- 理想の赤画像には、濃い染色、局所的な白い露光、像が見える領域と消える領域の関係がある。
+## Changes
+- `engines/chemical.js`: own GLSL utility source, fragment shader, palette, recipe generator, and uniform setter. The CHEMICAL visual algorithm is unchanged from v0.2.9.7.
+- `engines/leak.js`: independent GLSL utility source, fragment shader, 8 strong color palettes, mutation logic and uniform setter. The LEAK visual algorithm is unchanged from v0.2.9.7.
+- `sketch.js`: only dispatches to each engine. SOLAR and REGISTER retain the original shared renderer and shader source.
+- Mode-specific `modeRecipes` and `modeParams` preserve results and slider values independently. Switching away and back no longer automatically randomizes a mode; press MUTATE to change it.
+- The original photo remains the only shared texture source; neither engine uses the previous mode's output as input.
+- Save UI (DOWNLOAD PNG / SHARE / SAVE TO PHOTOS), high-resolution export and original aspect ratio are preserved.
 
-## 変更内容（LEAKのみ）
-- **単一の光量分布**から、染料の定着・白い露光・画像の復帰・ハレーションを連動して計算。
-- 四辺と斜めからの光の進入をMUTATEで選択。低周波の揺らぎを加え、直線の切断面・図形マスク・細い光線を使わない。
-- 色は高彩度の8系統（深紅、コバルト、ビリジアン、紫、シアン、アンバー、マゼンタ、黄緑）。MUTATEで直前と同じ色が連続しない。
-- 強い色の領域は現像画像の明暗を残し、露光側は写真の明暗を参照して乳白色に抜ける。方向に沿って白い露光の強弱も変わる。
-- AMOUNT は影響の強さ、CHANCE は不規則性と露光変動、PRESERVE は元写真の色を戻す割合を引き続き反映する。
+## Important diagnostic note
+The uploaded examples show translucent angular boundaries at nearly identical locations in both mode outputs. The reviewed CHEMICAL and LEAK shaders do not explicitly draw triangles; separation prevents cross-engine source changes but cannot guarantee removal of shapes already present in the source photograph or arising in the common WebGL renderer. If angles remain, compare an unmodified original photo and the app input, then investigate the shared WebGL draw path.
 
-## 変更していないもの
-- SOLAR / CHEMICAL / REGISTER のシェーダー
-- GUI、MUTATE / EDIT / BACK、画像の縦横比、1800 / 2600 / 3200 pxの書き出し、p5.js 1.11.13
-- v0.2.9.5で導入した画像生成後の **DOWNLOAD PNG / SHARE / SAVE TO PHOTOS**
-- WebGL描画直後に2D Canvasへ転写してからPNG化するエクスポート方式
+## Deployment
+Unzip into the GitHub Pages repository root. Overwrite `index.html`, `sketch.js`, `style.css`, `sw.js`, `manifest.webmanifest`, and ADD the NEW `engines/chemical.js` and `engines/leak.js` files (maintaining their directory). Keep the existing `icons/` folder. Check the header reads `0.2.9.8` after reload. When running as an iPhone home-screen app, close and restart; if cached files remain, remove and reinstall the home-screen shortcut.
 
-## 配置方法
-1. ZIP内の `index.html`, `style.css`, `sketch.js`, `sw.js`, `manifest.webmanifest` をGitHub Pagesリポジトリ直下の同名ファイルに上書き。
-2. 既存の `icons/` フォルダーは削除しない（このZIPには含まない）。
-3. 公開後、アプリのヘッダーが **0.2.9.7** になっていることを確認。
-4. iPhoneのホーム画面PWAで古い内容が表示されるときは、アプリを終了して開き直す。必要ならSafariから再追加。
-
-## 画像保存
-- SAVEをタップするとPNGを生成。生成後の「DOWNLOAD PNG」からダウンロードできる。
-- iPhoneで写真アプリへ直接保存する場合は「SHARE / SAVE TO PHOTOS」→ iOS共有シート「画像を保存」。
-- Windows/Macでは自動ダウンロードを試みるが、止められても表示された「DOWNLOAD PNG」から保存可能。
-
-## 検査結果
-- `node --check`：通過。
-- 独立したChromium+WebGLソフトウェアレンダリング（Mesa/Xvfb）でLEAKシェーダーのコンパイル・8パレットの実描画を確認。
-- 参考のシアン処理済み都市画像を入力に使用。実際の無加工写真やiPhone Safariでの結果は未検証。
-- その他3シェーダーと保存フローは今回変更せず、iPhone実機でのPNG書き出しは未検証。
+## Tests
+- JS syntax check for all three JavaScript files.
+- CHEMICAL and LEAK shader sources byte-for-byte match v0.2.9.7 content when the dedicated GLSL utilities are prepended, so their appearance should not change in this structural release.
+- Cross-mode state isolation and randomization tested programmatically.
+- Safari iPhone real-device drawing/export not verified.

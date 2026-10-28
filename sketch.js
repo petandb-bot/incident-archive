@@ -3,9 +3,17 @@
 window.IA_SCRIPT_LOADED = true;
 
 const APP = {
-  version: '0.2.9.7',
+  version: '0.2.9.8',
   mode: 'SOLAR',
+  // Per-mode state. Switching modes never mutates another engine's recipe/settings.
   params: { amount: 88, chance: 80, preserve: 22 },
+  modeParams: {
+    SOLAR:{amount:88,chance:80,preserve:22},
+    CHEMICAL:{amount:88,chance:80,preserve:22},
+    REGISTER:{amount:88,chance:80,preserve:22},
+    LEAK:{amount:88,chance:80,preserve:22}
+  },
+  modeRecipes: Object.create(null),
   recipe: null,
   history: [],
   source: null,
@@ -156,79 +164,6 @@ void main(){
   gl_FragColor=vec4(clamp(sabattier,0.0,1.0),1.0);
 }`;
 
-const CHEMICAL_FRAG = COMMON + `
-void main(){
-  vec2 uv = screenUV();
-  vec2 p = uv - 0.5;
-  vec3 base = texM(uv);
-  float amt = uAmount, ch = uChance;
-  float guard = subjectGuard(uv, base);
-
-  // All chemical structures are continuous 2D fields. There are no vertical
-  // slit masks, half-frame divisions or scanline-dependent color branches.
-  vec2 k0 = rot2(p, (uR0.x-0.5)*1.35);
-  vec2 k1 = rot2(p, (uR0.y-0.5)*1.62);
-  float bathA = fbm6(k0*2.8 + vec2(7.0,uSeed*0.017));
-  float bathB = fbm4(k1*5.5 + vec2(uSeed*0.020,19.0));
-  float salt = fbm4(rot2(p,0.86)*4.2 + vec2(31.0,uSeed*0.022));
-
-  // Slowly changing dye and developer densities; broad ramps prevent
-  // straight boundaries and the abrupt mid-frame 'cut' of the old result.
-  float developer = smoothstep(0.23,0.77,bathA*0.82+bathB*0.27);
-  float dyeLoss   = smoothstep(0.26,0.80,salt*0.76+bathB*0.28);
-  float bleach    = smoothstep(0.49,0.92,bathA*0.34+bathB*0.68);
-  float stain     = sat(developer*0.70+dyeLoss*0.38);
-
-  vec2 drift = vec2(
-    fbm4(p*1.95 + vec2(uSeed*0.011,4.0))-0.5,
-    fbm4(rot2(p,1.07)*2.10 + vec2(17.0,uSeed*0.014))-0.5
-  );
-  drift *= (0.64+0.36*(1.0-guard));
-  vec3 rS = texM(uv+drift*0.009*(0.20+amt)*vec2(1.0,0.8));
-  vec3 gS = texM(uv+drift*0.007*(0.18+amt)*vec2(-0.7,1.0));
-  vec3 bS = texM(uv+drift*0.011*(0.16+ch)*vec2(0.9,-0.6));
-  vec3 layer = vec3(rS.r,gS.g,bS.b);
-  vec3 cross = vec3(layer.g*0.82+layer.r*0.20,
-                    layer.b*0.74+layer.g*0.26,
-                    layer.r*0.78+layer.b*0.18);
-
-  vec3 spectral = mix(triPalette(bathA*0.62+uR1.x),
-                      mix(uC0,uC2,0.52),0.36);
-  vec3 chem = mix(base,cross,developer*(0.27+0.39*amt)*(1.0-0.15*guard));
-  chem = mix(chem,spectral*(0.78+0.29*lum(layer)),
-             dyeLoss*(0.12+0.24*ch));
-  chem = mix(chem,vec3(0.99,0.97,0.91),
-             bleach*(0.045+0.145*amt)*(1.0-lum(base)*0.30));
-
-  // Fine emulsion response, never a high-contrast geometry outline.
-  float edgeField = edge(uv,1.0/max(uResolution.x,1.0));
-  chem = screenBlend(chem,mix(uC1,vec3(1.0,0.95,0.89),0.43)
-                       *edgeField*stain*(0.035+0.085*amt));
-  vec3 residue = mix(uC0,uC2,smoothstep(0.20,0.82,bathB));
-  chem = mix(chem,chem*mix(vec3(1.0),residue,0.22),
-             stain*(0.20+0.22*ch));
-  chem = mix(chem,hsvShiftLike(chem,bathB*0.24+uR1.z*0.30),
-             0.11+0.18*amt);
-
-  float sediment = pow(hash21(floor(uv*uResolution*0.14)+uSeed*11.0),15.0)
-                   *stain*0.065*amt;
-  chem = mix(chem,vec3(0.96,0.93,0.86),sediment);
-  chem += vec3((hash21(floor(uv*uResolution)+uSeed*31.0)-0.5)
-               *(0.006+0.009*amt));
-
-  chem = preserveSource(base,chem);
-  vec3 tone = paletteWash(chem,mix(uC0,vec3(0.92,0.82,0.74),0.32),
-                          mix(uC1,uC2,0.46),vec3(1.0,0.99,0.96),
-                          0.31+0.28*amt);
-  tone = splitTone(tone,mix(uC0,uC2,0.48),
-                   mix(uC1,vec3(1.0),0.40),0.16+0.19*ch);
-  tone = hueRotate(tone,(uR0.x-0.5)*0.23+(bathB-0.5)*0.10);
-  tone = contrastSat(tone,0.065+0.10*amt,1.10+0.14*amt);
-  chem = mix(chem,tone,0.46+0.23*amt);
-  chem = softShoulder(chem);
-  gl_FragColor=vec4(clamp(chem,0.0,1.0),1.0);
-}`;
-
 const REGISTER_FRAG = COMMON + `
 void main(){
   vec2 uv=screenUV();
@@ -277,131 +212,6 @@ void main(){
 }`;
 
 
-const LEAK_FRAG = COMMON + `
-// Variable-density optical leak / chromogenic film response.
-// A single edge-oriented light field drives three related responses:
-// dye saturation, selective loss of the latent image and photographic halation.
-// It is never composited as an opaque geometric shape.
-float leakFalloff(float d, float reach){
-  float x=max(d,0.0)/max(reach,0.10);
-  return exp(-1.12*pow(x,1.62));
-}
-void main(){
-  vec2 uv=screenUV();
-  vec2 p=uv-0.5;
-  vec3 base=texM(uv);
-  float amt=uAmount;
-  float chance=uChance;
-  float family=floor(uR2.w*5.0);
-
-  vec2 anchor, tangent, inward;
-  if(family<1.0){
-    anchor=vec2(mix(0.25,0.75,uH0.x),-0.07);
-    tangent=vec2(1.0,0.0);inward=vec2(0.0,1.0);
-  }else if(family<2.0){
-    anchor=vec2(mix(0.25,0.75,uH0.x),1.07);
-    tangent=vec2(1.0,0.0);inward=vec2(0.0,-1.0);
-  }else if(family<3.0){
-    anchor=vec2(-0.07,mix(0.25,0.75,uH0.x));
-    tangent=vec2(0.0,1.0);inward=vec2(1.0,0.0);
-  }else if(family<4.0){
-    anchor=vec2(1.07,mix(0.25,0.75,uH0.x));
-    tangent=vec2(0.0,1.0);inward=vec2(-1.0,0.0);
-  }else{
-    anchor=vec2(mix(0.12,0.55,uH0.x),-0.08);
-    tangent=normalize(vec2(0.91,0.42));
-    inward=normalize(vec2(-0.42,0.91));
-  }
-
-  vec2 domain=rot2(p,(uR0.x-0.5)*0.80);
-  float broad=fbm4(domain*1.8+vec2(7.0,uSeed*0.017));
-  float medium=fbm4(rot2(p,0.8)*4.1+vec2(uSeed*0.031,26.2));
-  float fine=noise2(p*8.5+vec2(59.0,uSeed*0.053));
-  float pores=fbm4(p*6.4+vec2(uSeed*0.042,43.2));
-  vec2 rel=uv-anchor;
-  float depth=dot(rel,inward);
-  float sideways=dot(rel,tangent);
-
-  // Disturb the reach over wide distances, not by drawing wobbly polygons.
-  float travel=depth+(broad-0.54)*(0.26+0.17*chance)
-                    +(medium-0.51)*(0.07+0.10*chance);
-  float reach=mix(0.52,0.88,uH0.y);
-  float exposure=leakFalloff(travel,reach);
-  float across=sideways+(medium-0.5)*0.16;
-  exposure*=1.0-0.21*smoothstep(0.45,1.10,abs(across));
-  exposure*=0.81+0.27*broad+0.19*medium;
-  // Inhomogeneous density and two weak irregular emulsion blooms.
-  float cloud=0.18+0.82*smoothstep(0.23,0.76,pores);
-  exposure*=mix(0.81,1.15,cloud);
-  exposure=clamp(exposure*(0.88+0.63*amt),0.0,1.55);
-
-  // Separate spatially related phases: dense filter near the source,
-  // revealed photograph in the middle, and pale exposed highlights.
-  float density=smoothstep(0.12,1.07,exposure);
-  float saturation=smoothstep(0.05,0.70,exposure);
-  float localLuma=lum(base);
-  // Local halos respect photographic brightness, rather than overlaying a disc.
-  vec2 d=vec2(0.010,0.015);
-  float softScene=(lum(texM(uv+vec2(d.x,0.0)))+
-                   lum(texM(uv-vec2(d.x,0.0)))+
-                   lum(texM(uv+vec2(0.0,d.y)))+
-                   lum(texM(uv-vec2(0.0,d.y))))*0.25;
-  float luminous=smoothstep(0.18,0.89,0.61*localLuma+0.39*softScene);
-  float edgeOfBurn=smoothstep(0.14,0.43,exposure)*
-                   (1.0-smoothstep(0.73,1.21,exposure));
-  float wet=0.73+0.28*broad+0.20*medium;
-
-  // Dyes selected by MUTATE: one family per exposure, no shared pastel palette.
-  vec3 dye=mix(uC0,uC1,0.44+0.47*density);
-  dye=mix(dye,uC2,0.06+0.11*fine);
-  // Dense film stain is strongly chromatic, not a pale RGB overlay.
-  // Spatially modulated scene luminance preserves photographic structure.
-  vec3 dyed=dye*(0.22+0.47*density+0.31*localLuma)
-             +base*(0.045+0.12*(1.0-density));
-  float deposit=saturation*(0.56+0.44*amt)*wet;
-  vec3 outc=mix(base,dyed,clamp(deposit,0.0,0.97));
-
-  // At the edge of exposure, emulsion clears and bright objects bloom.
-  // Photo-linked white breakouts keep the scene legible while visible light
-  // spreads irregularly across it, not as a single flat saturated block.
-  float lift=edgeOfBurn*(0.14+0.43*luminous)
-             *(0.31+0.46*amt)*(0.65+0.35*chance);
-  vec3 pale=mix(uC2,vec3(1.0),0.74+0.20*luminous);
-  outc=mix(outc,pale,clamp(lift,0.0,0.70));
-
-  // Broad overexposure that breaks through the dye. Its position follows
-  // the same incoming light direction, with nonperiodic density drift.
-  float center=mix(0.29,0.67,uH1.x);
-  float width=mix(0.17,0.32,uH1.y);
-  float drift=(broad-0.52)*0.23+(medium-0.50)*0.095;
-  float bloomCross=exp(-pow(abs(depth-center+drift)/width,2.0));
-  float flareSide=uR1.z>0.5 ? sideways : -sideways;
-  float asymmetry=smoothstep(-0.46,0.81,flareSide+(medium-0.5)*0.21);
-  float whiteBreak=bloomCross*smoothstep(0.17,0.56,exposure)
-                  *(0.32+0.55*amt)*(0.47+0.53*luminous)
-                  *(0.75+0.25*medium)*mix(0.66,1.48,asymmetry);
-  outc=mix(outc,mix(pale,vec3(1.0),0.78),
-           clamp(whiteBreak,0.0,0.85));
-
-  float hotHighlights=smoothstep(0.45,0.91,
-                          0.60*localLuma+0.40*softScene);
-  float bloom=saturation*hotHighlights*(0.035+0.12*amt)*
-              (0.64+0.36*medium);
-  outc=screenBlend(outc,pale*bloom);
-
-  // Patches of dye fade continuously into the original latent image.
-  float recovery=(1.0-density)*smoothstep(0.31,0.72,medium)
-                  *(0.12+0.19*chance);
-  outc=mix(outc,base,recovery);
-  float grain=(hash21(floor(uv*uResolution)+uSeed*37.0)-0.5)*
-              (0.004+0.009*amt);
-  outc+=vec3(grain);
-  outc=mix(base,outc,smoothstep(0.0,0.11,amt));
-  outc=preserveSource(base,outc);
-  outc=mix(outc,softShoulder(outc),0.28);
-  gl_FragColor=vec4(clamp(outc,0.0,1.0),1.0);
-}`;
-
 const PALETTES = [
   {name:'EMBER FILM', c0:[0.95,0.58,0.32], c1:[1.00,0.85,0.55], c2:[0.98,0.48,0.66]},
   {name:'MINT BATH', c0:[0.55,0.84,0.67], c1:[0.74,0.92,0.88], c2:[0.90,0.98,0.96]},
@@ -411,24 +221,9 @@ const PALETTES = [
   {name:'PALE SILVER', c0:[0.72,0.76,0.80], c1:[0.90,0.92,0.95], c2:[0.99,0.97,0.94]}
 ];
 
-// LEAK exclusively uses full-strength photographic dye colors. The shared
-// PALETTES used by SOLAR, CHEMICAL and REGISTER remain untouched.
-const LEAK_PALETTES = [
-  {name:'SCARLET FLOOD', c0:[0.42,0.010,0.016], c1:[0.98,0.025,0.018], c2:[1.00,0.68,0.44]},
-  {name:'COBALT FLOOD', c0:[0.012,0.030,0.32], c1:[0.035,0.20,1.00], c2:[0.57,0.75,1.00]},
-  {name:'VIRIDIAN FLOOD', c0:[0.005,0.20,0.095], c1:[0.015,0.79,0.32], c2:[0.62,1.00,0.64]},
-  {name:'VIOLET FLOOD', c0:[0.24,0.012,0.34], c1:[0.70,0.035,0.97], c2:[0.95,0.61,1.00]},
-  {name:'CYAN FLOOD', c0:[0.006,0.24,0.28], c1:[0.00,0.82,0.96], c2:[0.58,0.97,1.00]},
-  {name:'AMBER FLOOD', c0:[0.46,0.13,0.006], c1:[1.00,0.49,0.012], c2:[1.00,0.88,0.48]},
-  {name:'MAGENTA FLOOD', c0:[0.36,0.004,0.17], c1:[1.00,0.04,0.48], c2:[1.00,0.63,0.77]},
-  {name:'ACID FLOOD', c0:[0.28,0.32,0.008], c1:[0.84,0.96,0.015], c2:[0.99,1.00,0.57]}
-];
-
 const FAMILIES = {
   SOLAR:['SABATTIER','METALLIC','FLASHLINE','PARTIAL NEGATIVE','OVEREXPOSE'],
-  CHEMICAL:['BLEACH BATH','DYE FAILURE','DEVELOPER SURGE','CROSS BATH','SILVER RESIDUE'],
-  REGISTER:['OFFSET','SLIT','DOUBLE', 'MISALIGN', 'PLATE SHIFT'],
-  LEAK:['UPPER FLOOD','LOWER FLOOD','LEFT FLOOD','RIGHT FLOOD','DOUBLE FLOOD']
+  REGISTER:['OFFSET','SLIT','DOUBLE', 'MISALIGN', 'PLATE SHIFT']
 };
 
 let ui = {};
@@ -444,10 +239,12 @@ function setup(){
     pixelDensity(Math.min(window.devicePixelRatio || 1, 2));
     noStroke();
     APP.shaders.SOLAR = createShader(VERT, SOLAR_FRAG);
-    APP.shaders.CHEMICAL = createShader(VERT, CHEMICAL_FRAG);
+    APP.shaders.CHEMICAL = createShader(VERT, window.IAEngines.CHEMICAL.fragment);
     APP.shaders.REGISTER = createShader(VERT, REGISTER_FRAG);
-    APP.shaders.LEAK = createShader(VERT, LEAK_FRAG);
+    APP.shaders.LEAK = createShader(VERT, window.IAEngines.LEAK.fragment);
+    APP.params = APP.modeParams[APP.mode];
     APP.recipe = makeRecipe(APP.mode);
+    APP.modeRecipes[APP.mode] = APP.recipe;
     APP.ready = true;
     wireUI();
     syncControls();
@@ -511,7 +308,9 @@ function handleFile(e){
     APP.sourceName=file.name||'photo';
     updatePhotoMeta(file);
     APP.history=[];
+    APP.modeRecipes=Object.create(null);
     APP.recipe=makeRecipe(APP.mode);
+    APP.modeRecipes[APP.mode]=APP.recipe;
     fitPreviewCanvas(img.width,img.height);
     ui.emptyState.hidden=true;
     ui.saveButton.disabled=false;
@@ -569,9 +368,12 @@ function fitPreviewCanvas(w,h){
 
 function setMode(mode,push=true){
   if(!APP.shaders[mode]) return;
-  if(push&&APP.source) pushHistory();
+  if(push&&APP.source&&APP.mode!==mode) pushHistory();
   APP.mode=mode;
-  APP.recipe=makeRecipe(mode);
+  APP.params=APP.modeParams[mode];
+  if(!APP.modeRecipes[mode]) APP.modeRecipes[mode]=makeRecipe(mode);
+  APP.recipe=APP.modeRecipes[mode];
+  syncControls();
   document.documentElement.dataset.mode=mode.toLowerCase();
   ui.modeButtons.forEach(b=>{const on=b.dataset.mode===mode;b.classList.toggle('active',on);b.setAttribute('aria-pressed',on?'true':'false');});
   ui.statusText.textContent=APP.source?'READY / '+mode:'READY / ADD A PHOTO';
@@ -582,7 +384,8 @@ function setMode(mode,push=true){
 function mutate(){
   if(!APP.source){ ui.photoInput.click(); return; }
   pushHistory();
-  APP.recipe=makeRecipe(APP.mode);
+  APP.recipe=makeRecipe(APP.mode, APP.recipe);
+  APP.modeRecipes[APP.mode]=APP.recipe;
   updateVariation();
   ui.mutateButton.animate([{transform:'translateX(0)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}],{duration:180,easing:'ease-out'});
   renderPreview();
@@ -598,8 +401,10 @@ function goBack(){
   if(!APP.history.length) return;
   const prev=APP.history.pop();
   APP.mode=prev.mode;
-  APP.params={...prev.params};
-  APP.recipe=prev.recipe;
+  APP.modeParams[prev.mode]={...prev.params};
+  APP.params=APP.modeParams[prev.mode];
+  APP.modeRecipes[prev.mode]=prev.recipe;
+  APP.recipe=APP.modeRecipes[prev.mode];
   syncControls();
   document.documentElement.dataset.mode=APP.mode.toLowerCase();
   ui.modeButtons.forEach(b=>{const on=b.dataset.mode===APP.mode;b.classList.toggle('active',on);b.setAttribute('aria-pressed',on?'true':'false');});
@@ -615,30 +420,24 @@ function toggleEdit(){
   ui.editChevron.textContent=open?'−':'＋';
 }
 
-function makeRecipe(mode){
-  const rnd=()=>Math.random();
-  const palettes = mode==='LEAK' ? LEAK_PALETTES : PALETTES;
-  let paletteIndex = Math.floor(rnd()*palettes.length);
-  // For LEAK, each MUTATE selects a genuinely different color family.
-  if(mode==='LEAK' && APP.mode==='LEAK' && APP.recipe &&
-     palettes[paletteIndex].name===APP.recipe.palette){
-    paletteIndex=(paletteIndex+1+Math.floor(rnd()*(palettes.length-1)))%palettes.length;
+function makeRecipe(mode, previous=null){
+  // CHEMICAL and LEAK use separate shader programs and randomization code.
+  if(mode==='CHEMICAL'||mode==='LEAK'){
+    const engine=window.IAEngines && window.IAEngines[mode];
+    if(!engine) throw new Error('ENGINE MISSING / '+mode);
+    return engine.makeRecipe(previous);
   }
-  const p=palettes[paletteIndex];
+  const rnd=()=>Math.random();
+  const p=PALETTES[Math.floor(rnd()*PALETTES.length)];
   const familyIndex=Math.floor(rnd()*FAMILIES[mode].length);
   const fam=FAMILIES[mode][familyIndex];
   const recipe={
     seed:rnd()*99,
-    h0:[rnd(),rnd(),rnd(),rnd()], h1:[rnd(),rnd(),rnd(),rnd()], h2:[rnd(),rnd(),rnd(),rnd()],
-    r0:[rnd(),rnd(),rnd(),rnd()], r1:[rnd(),rnd(),rnd(),rnd()], r2:[rnd(),rnd(),rnd(),rnd()],
-    c0:p.c0, c1:p.c1, c2:p.c2, palette:p.name, family:fam, id:Math.floor(1+rnd()*98)
+    h0:[rnd(),rnd(),rnd(),rnd()],h1:[rnd(),rnd(),rnd(),rnd()],h2:[rnd(),rnd(),rnd(),rnd()],
+    r0:[rnd(),rnd(),rnd(),rnd()],r1:[rnd(),rnd(),rnd(),rnd()],r2:[rnd(),rnd(),rnd(),rnd()],
+    c0:p.c0,c1:p.c1,c2:p.c2,palette:p.name,family:fam,id:Math.floor(1+rnd()*98)
   };
-  if(mode==='SOLAR'){
-    recipe.r2[3]=fam==='FLASHLINE' ? 0.96+rnd()*0.04 : rnd()*0.72;
-  }
-  if(mode==='LEAK'){
-    recipe.r2[3]=(familyIndex+0.18+rnd()*0.54)/FAMILIES.LEAK.length;
-  }
+  if(mode==='SOLAR') recipe.r2[3]=fam==='FLASHLINE'?0.96+rnd()*0.04:rnd()*0.72;
   return recipe;
 }
 
@@ -665,10 +464,17 @@ function setUniforms(target, w, h){
 }
 
 function shaderSourceFor(mode){
-  if(mode==='SOLAR') return SOLAR_FRAG;
-  if(mode==='CHEMICAL') return CHEMICAL_FRAG;
-  if(mode==='REGISTER') return REGISTER_FRAG;
-  return LEAK_FRAG;
+  if(mode==='CHEMICAL'||mode==='LEAK') return window.IAEngines[mode].fragment;
+  return mode==='SOLAR' ? SOLAR_FRAG : REGISTER_FRAG;
+}
+
+function applyModeUniforms(target, mode, w, h){
+  if(mode==='CHEMICAL'||mode==='LEAK'){
+    // Only the selected engine controls its own uniforms.
+    window.IAEngines[mode].setUniforms(target, APP.source, w, h, APP.modeParams[mode], APP.modeRecipes[mode]);
+  }else{
+    setUniforms(target,w,h);
+  }
 }
 
 function renderPreview(){
@@ -681,7 +487,7 @@ function renderPreview(){
        the preview buffer can be 2x the p5 logical canvas size, so pass the
        physical resolution here. Export already uses pixelDensity(1). */
     const d=pixelDensity();
-    setUniforms(sh,width*d,height*d);
+    applyModeUniforms(sh,APP.mode,width*d,height*d);
     clear();
     plane(width,height,1,1);
     resetShader();
@@ -727,7 +533,7 @@ async function saveHighRes(){
     g.noStroke();
     const sh=g.createShader(VERT,shaderSourceFor(APP.mode));
     g.shader(sh);
-    setUniforms(sh,outW,outH);
+    applyModeUniforms(sh,APP.mode,outW,outH);
     g.clear();
     g.plane(outW,outH,1,1);
     g.resetShader();
