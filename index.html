@@ -10,15 +10,15 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="description" content="Incident Archive — photographic chance engine">
   <title>Incident Archive</title>
-  <link rel="manifest" href="./manifest.webmanifest?v=0302">
-  <link rel="apple-touch-icon" href="./icons/icon-180.png?v=0302">
-  <link rel="stylesheet" href="./style.css?v=0302">
+  <link rel="manifest" href="./manifest.webmanifest?v=0304">
+  <link rel="apple-touch-icon" href="./icons/icon-180.png?v=0304">
+  <link rel="stylesheet" href="./style.css?v=0304">
 </head>
 <body>
   <main class="app-shell">
     <header class="masthead">
       <div class="wordmark" aria-label="Incident Archive"><span>INCIDENT</span><span>ARCHIVE</span></div>
-      <span class="version">0.3.3</span>
+      <span class="version">0.3.4</span>
       <button id="openPhotoTop" class="open-top" type="button" title="Open a photo" aria-label="Open a photo">
         <span class="menu-lines" aria-hidden="true"><i></i><i></i><i></i></span>
       </button>
@@ -99,14 +99,14 @@
   <input id="photoInput" type="file" accept="image/*" hidden>
   <script src="https://cdn.jsdelivr.net/npm/p5@1.11.13/lib/p5.min.js"></script>
   <!-- Independent shader engines; load before main sketch. -->
-  <script src="./engines/solar.js?v=0302"></script>
-  <script src="./engines/register.js?v=0302"></script>
-  <script src="./engines/chemical.js?v=0302"></script>
-  <script src="./engines/leak.js?v=0302"></script>
-  <script src="./sketch.js?v=0302"></script>
+  <script src="./engines/solar.js?v=0304"></script>
+  <script src="./engines/register.js?v=0304"></script>
+  <script src="./engines/chemical.js?v=0304"></script>
+  <script src="./engines/leak.js?v=0304"></script>
+  <script src="./sketch.js?v=0304"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=0302', {updateViaCache:'none'}).catch(console.warn));
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=0304', {updateViaCache:'none'}).catch(console.warn));
     }
   </script>
 </body>

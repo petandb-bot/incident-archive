@@ -1,5 +1,5 @@
-const CACHE='incident-archive-v0302';
-const CORE=['./','./index.html','./style.css?v=0302','./sketch.js?v=0302','./engines/solar.js?v=0302','./engines/register.js?v=0302','./engines/chemical.js?v=0302','./engines/leak.js?v=0302','./manifest.webmanifest?v=0302','./icons/icon-180.png','./icons/icon-192.png','./icons/icon-512.png'];
+const CACHE='incident-archive-v0304';
+const CORE=['./','./index.html','./style.css?v=0304','./sketch.js?v=0304','./engines/solar.js?v=0304','./engines/register.js?v=0304','./engines/chemical.js?v=0304','./engines/leak.js?v=0304','./manifest.webmanifest?v=0304','./icons/icon-180.png','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting()));
 });
